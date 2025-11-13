@@ -12,7 +12,7 @@ import java.util.UUID;
  */
 @Getter
 @Setter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)           // control equality - Entity equality based on id now
 @ToString(onlyExplicitlyIncluded = true)
 @Entity
