@@ -1,4 +1,4 @@
-package com.microflix.user_service;
+package com.microflix.userservice;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

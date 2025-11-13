@@ -1,0 +1,30 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: user-service
+  datasource:
+    url: jdbc:postgresql://localhost:5434/userdb      # where to connect (JDBC connection string to postgres db)
+    username: user
+    password: user
+    jpa:
+      hibernate:
+        ddl-auto: validate                            # Don't let Hibernate auto-create/change tables. (verify schema)
+      properties:
+        hibernate.jdbc.time_zone: UTC                 # Treat timestamps consistently in UTC
+        hibernate.format_sql: true                    # Pretty-print SQL in logs for easier debugging
+    flyway:
+      enabled: true                                   # Turn Flyway on for this service (run versioned SQL at startup)
+      locations: classpath:db/migration               # Where Flyway should look for migration files on the classpath (where V1__*.sql lives)
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,mappings
