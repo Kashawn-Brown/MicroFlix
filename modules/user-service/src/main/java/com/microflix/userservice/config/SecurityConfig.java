@@ -1,6 +1,7 @@
 package com.microflix.userservice.config;
 
 import com.microflix.userservice.auth.JwtService;
+import com.microflix.userservice.security.JwtAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,22 +10,28 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * Security setup (very light for now):
+ * Security setup:
  * - Allow /auth/** and health endpoints without a token.
  */
 @Configuration
 public class SecurityConfig {
 
+    // Setting security rules + JWT wiring
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable());      // disabling CSRF (for stateless API)
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter) throws Exception {
+        http.csrf(csrf -> csrf.disable());                              // disabling CSRF (for stateless API)
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/**", "/actuator/**", "/act/**").permitAll()     // Permitting so users can register/login and we can health-check
-                .anyRequest().permitAll()       // leaving everything open for now
+                .requestMatchers("/api/**").authenticated()                             // Require Authentication for these
+                .anyRequest().permitAll()                                                        // leaving everything else open for now
         );
-        http.httpBasic(Customizer.withDefaults()); // not used, but harmless
+
+        // run JWT filter before Spring's username/password auth filter in security filter chain (just need to happen ear;y -> before Spring decides authorization)
+        http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 
@@ -42,6 +49,12 @@ public class SecurityConfig {
             @Value("${app.jwt.ttl-minutes}") long ttlMinutes
     ) {
         return new JwtService(secret, issuer, ttlMinutes);
+    }
+
+    // Making the filter a bean so Spring can inject it
+    @Bean
+    public JwtAuthFilter jwtAuthFilter(JwtService jwt) {
+        return new JwtAuthFilter(jwt);
     }
 
 }
