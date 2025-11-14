@@ -1,5 +1,6 @@
 package com.microflix.userservice.user;
 
+import com.microflix.userservice.security.CurrentUser;
 import com.microflix.userservice.user.dto.ChangePasswordRequest;
 import com.microflix.userservice.user.dto.UpdateProfileRequest;
 import org.springframework.http.HttpStatus;
@@ -15,7 +16,8 @@ import java.time.ZoneOffset;
 import java.util.Map;
 
 /**
- * Profile endpoint -> For current user endpoints
+ * Profile endpoints -> For current user endpoints
+ *
  * Protected sample endpoint:
  * - requires a valid JWT (per security rules)
  * - returns the current user's email + roles
@@ -24,12 +26,10 @@ import java.util.Map;
 @RequestMapping("/api/v1/profile")
 public class ProfileController {
 
-    private final UserRepository users;
-    private final PasswordEncoder encoder;
+    private final ProfileService profileService;
 
-    public ProfileController(UserRepository users, PasswordEncoder encoder) {
-        this.users = users;
-        this.encoder = encoder;
+    public ProfileController(ProfileService profileService) {
+        this.profileService = profileService;
     }
 
     /**     ROUTES      **/
@@ -37,61 +37,36 @@ public class ProfileController {
     // Spring injects Authentication from SecurityContext (set by our JwtAuthFilter)
     @GetMapping("/me")
     public Map<String, Object> me(Authentication auth) {            // Authentication is a recognized parameter type -> reads the Authentication from SecurityContextHolder.getContext() and passes it in
-        return Map.of(
-                "email", auth.getName(),
-                "roles", auth.getAuthorities().stream().map(Object::toString).toList()
-        );
+
+        var currentUser = CurrentUser.set(auth);
+        return profileService.me(currentUser);
+
     }
 
     /**
-     * Route to update User
+     * Update User
      * Basic for now -> only update displayName
      * **/
     @PatchMapping
-    public Map<String, Object> update(@Validated @RequestBody UpdateProfileRequest req, Authentication auth) {
+    public Map<String, Object> update(@Validated @RequestBody UpdateProfileRequest request, Authentication auth) {
 
-        // find current user by email
-        var user = users.findByEmail(auth.getName())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        var currentUser = CurrentUser.set(auth);
 
-        // update displayName
-        if (req.displayName() != null) {
-            user.setDisplayName(req.displayName());
-        }
-
-        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-        users.save(user);
-
-        // minimal response —> a snapshot after update
-        return Map.of(
-                "email", user.getEmail(),
-                "displayName", user.getDisplayName()
-        );
-
+        return profileService.update(currentUser, request);
     }
 
 
+    /**
+     * Change the current user's password.
+     * - validates old password
+     * - sets new password
+     */
     @PatchMapping("/password")
     public ResponseEntity<?> changePassword(@Validated @RequestBody ChangePasswordRequest request, Authentication auth) {
 
-        // get current user by email
-        var user = users.findByEmail(auth.getName())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        var currentUser = CurrentUser.set(auth);
 
-        // verify current password matches stored hash
-        if (!encoder.matches(request.oldPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("Old password is incorrect");
-        }
-
-        // hash and set the new password
-        user.setPasswordHash(encoder.encode(request.newPassword()));
-
-        // update audit timestamp
-        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-        users.save(user);
-
-        // 204 No Content — change succeeded, nothing else to return
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        return profileService.changePassword(currentUser, request);
     }
 
 }
