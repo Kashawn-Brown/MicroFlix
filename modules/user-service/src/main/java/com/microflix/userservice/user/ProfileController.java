@@ -23,4 +23,6 @@ public class ProfileController {
                 "roles", auth.getAuthorities().stream().map(Object::toString).toList()
         );
     }
+
+
 }
