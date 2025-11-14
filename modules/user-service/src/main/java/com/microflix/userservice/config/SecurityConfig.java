@@ -28,12 +28,12 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter) throws Exception {
         http.csrf(csrf -> csrf.disable());                              // disabling CSRF (for stateless API)
         http.authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**", "/actuator/**", "/act/**").permitAll()     // Permitting so users can register/login and we can health-check
-                .requestMatchers("/api/**").authenticated()                             // Require Authentication for these
+                .requestMatchers("/api/v1/auth/**", "/actuator/**", "/act/**").permitAll()     // Permitting so users can register/login and we can health-check
+                .requestMatchers("/api/**").authenticated()                             // Everything else under /api/** will require authentication
                 .anyRequest().permitAll()                                                        // leaving everything else open for now
         );
 
-        // run JWT filter before Spring's username/password auth filter in security filter chain (just need to happen ear;y -> before Spring decides authorization)
+        // run JWT filter before Spring's username/password auth filter in security filter chain (just need to happen early -> before Spring decides authorization)
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

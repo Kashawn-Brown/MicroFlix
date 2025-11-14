@@ -18,7 +18,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "users")
 public class User {
-    @Id @EqualsAndHashCode.Include
+    @Id @EqualsAndHashCode.Include @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @ToString.Include
@@ -49,8 +49,8 @@ public class User {
 
     @PrePersist
     void onCreate() {
-        if (id == null) id = UUID.randomUUID();          // ID if missing
         if (email != null) email = email.toLowerCase();  // normalize
+
         var now = OffsetDateTime.now(ZoneOffset.UTC);    // app-clock in UTC
         createdAt = now;
         updatedAt = now;

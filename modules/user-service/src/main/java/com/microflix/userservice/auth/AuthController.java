@@ -11,8 +11,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Auth endpoints -> register and login.
+ *
+ * Routes here are public (SecurityConfig):
+ */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/v1/auth")
 public class AuthController {
 
     private final AuthService service;
@@ -21,20 +26,25 @@ public class AuthController {
         this.service = service;
     }
 
+    /**
+     * User Register
+     *
+     */
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Validated @RequestBody RegisterRequest request) {
-        String token = service.register(request);
-
-        AuthResponse response = new AuthResponse(token, request.email(), request.displayName(),"USER");
+        var response = service.register(request);
 
         return ResponseEntity.ok(response);
     }
 
+
+    /**
+     * User Login
+     *
+     */
     @PostMapping("login")
     ResponseEntity<AuthResponse> login(@Validated @RequestBody LoginRequest request) {
-        String token = service.login(request);
-
-        AuthResponse response = new AuthResponse(token, request.email(), null, "USER");
+        var response = service.login(request);
 
         return ResponseEntity.ok(response);
     }

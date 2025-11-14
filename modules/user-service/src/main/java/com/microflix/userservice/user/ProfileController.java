@@ -2,6 +2,7 @@ package com.microflix.userservice.user;
 
 import com.microflix.userservice.security.CurrentUser;
 import com.microflix.userservice.user.dto.ChangePasswordRequest;
+import com.microflix.userservice.user.dto.ProfileMeResponse;
 import com.microflix.userservice.user.dto.UpdateProfileRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +24,7 @@ import java.util.Map;
  * - returns the current user's email + roles
  */
 @RestController
-@RequestMapping("/api/v1/profile")
+@RequestMapping("/api/v1/users")
 public class ProfileController {
 
     private final ProfileService profileService;
@@ -36,19 +37,21 @@ public class ProfileController {
 
     // Spring injects Authentication from SecurityContext (set by our JwtAuthFilter)
     @GetMapping("/me")
-    public Map<String, Object> me(Authentication auth) {            // Authentication is a recognized parameter type -> reads the Authentication from SecurityContextHolder.getContext() and passes it in
+    public ProfileMeResponse me(Authentication auth) {            // Authentication is a recognized parameter type -> reads the Authentication from SecurityContextHolder.getContext() and passes it in
 
         var currentUser = CurrentUser.set(auth);
         return profileService.me(currentUser);
 
     }
 
+
     /**
      * Update User
+     *
      * Basic for now -> only update displayName
      * **/
-    @PatchMapping
-    public Map<String, Object> update(@Validated @RequestBody UpdateProfileRequest request, Authentication auth) {
+    @PatchMapping("/me")
+    public ProfileMeResponse update(@Validated @RequestBody UpdateProfileRequest request, Authentication auth) {
 
         var currentUser = CurrentUser.set(auth);
 
@@ -58,10 +61,11 @@ public class ProfileController {
 
     /**
      * Change the current user's password.
+     *
      * - validates old password
      * - sets new password
      */
-    @PatchMapping("/password")
+    @PatchMapping("/me/password")
     public ResponseEntity<?> changePassword(@Validated @RequestBody ChangePasswordRequest request, Authentication auth) {
 
         var currentUser = CurrentUser.set(auth);
