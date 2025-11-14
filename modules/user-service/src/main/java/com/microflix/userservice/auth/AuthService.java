@@ -8,6 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Service
@@ -35,8 +36,8 @@ public class AuthService {
         u.setDisplayName(request.displayName());
         u.setRoles("USER");
         u.setActive(true);
-        u.setCreatedAt(OffsetDateTime.now());
-        u.setUpdatedAt(OffsetDateTime.now());
+        u.setCreatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        u.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
 
         // Save user to DB
         users.save(u);
@@ -54,7 +55,7 @@ public class AuthService {
         }
 
         // Update last login
-        u.setLastLoginAt(OffsetDateTime.now());
+        u.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
 
         // Save user to DB
         users.save(u);
