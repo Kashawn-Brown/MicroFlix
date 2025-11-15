@@ -1,0 +1,44 @@
+services:
+  db:                                 # Database Service (Container)
+    image: postgres:18
+    container_name: pg-user          # optional, keeps your old name
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: userdb           # matches your Spring config
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: user
+    ports:
+      - "5434:5432"                 # host:container, matches jdbc://localhost:5434
+    volumes:
+      - pg_user_data:/var/lib/postgresql
+      # named volume so data persists even if container is removed
+
+
+  user-service:                         # User Service (Container)
+    build:
+      context: ..                       # repo root (one level up from docker/)
+      dockerfile: modules/user-service/Dockerfile               # path from repo root to the Dockerfile
+    container_name: user-service
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/userdb
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: user
+      EUREKA_CLIENT_ENABLED: "false"                        # Disable Eureka when running in Docker
+      SPRING_CLOUD_DISCOVERY_ENABLED: "false"               # Disable Eureka when running in Docker
+    ports:
+      - "8082:8082"                     # host:container
+
+volumes:
+  pg_user_data:
+
+
+
+
+
+
+
+
+
