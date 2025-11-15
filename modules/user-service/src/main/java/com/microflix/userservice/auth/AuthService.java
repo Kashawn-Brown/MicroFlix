@@ -36,8 +36,8 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         var normalizedEmail = request.email().toLowerCase();
 
-        if (users.existsByEmail(request.email())){
-            throw new IllegalArgumentException("Email already in use");     // enforce unique emails
+        if (users.existsByEmail(normalizedEmail)){
+            throw new IllegalArgumentException("Email is already registered");     // enforce unique emails
         }
 
         var user = new User();
@@ -68,7 +68,7 @@ public class AuthService {
         var normalizedEmail = request.email().toLowerCase();
 
         User user = users.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
 
         // If user is deactivated
         // if (!user.isActive()) {
@@ -76,7 +76,7 @@ public class AuthService {
         // }
 
         if (!encoder.matches(request.password(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("Invalid credentials");
+            throw new IllegalArgumentException("Invalid email or password");
         }
 
         // Update last login
