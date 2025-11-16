@@ -15,8 +15,7 @@ spring:
               enabled: true   # auto-creates a route per registered service in Eureka
               lower-case-service-id: true    # route IDs/paths are lowercased
       routes:    # shouldn't be needed as routes should auto create and register
-        # Route auth + user endpoints through to user-service
-        - id: user-service
+        - id: user-service                           # Route auth + user endpoints through to user-service
           uri: lb://user-service
           predicates:
             - Path=/api/v1/auth/**, /api/v1/users/**      # Match both /api/v1/auth/** and /api/v1/users/**
