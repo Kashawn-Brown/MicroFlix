@@ -37,10 +37,13 @@ public class ProfileController {
 
     // Spring injects Authentication from SecurityContext (set by our JwtAuthFilter)
     @GetMapping("/me")
-    public ProfileMeResponse me(Authentication auth) {            // Authentication is a recognized parameter type -> reads the Authentication from SecurityContextHolder.getContext() and passes it in
+    public ResponseEntity<ProfileMeResponse> me(Authentication auth) {            // Authentication is a recognized parameter type -> reads the Authentication from SecurityContextHolder.getContext() and passes it in
 
         var currentUser = CurrentUser.set(auth);
-        return profileService.me(currentUser);
+
+        var response = profileService.me(currentUser);
+
+        return ResponseEntity.ok(response);
 
     }
 
@@ -51,11 +54,13 @@ public class ProfileController {
      * Basic for now -> only update displayName
      * **/
     @PatchMapping("/me")
-    public ProfileMeResponse update(@Validated @RequestBody UpdateProfileRequest request, Authentication auth) {
+    public ResponseEntity<ProfileMeResponse> updateProfile(@Validated @RequestBody UpdateProfileRequest request, Authentication auth) {
 
         var currentUser = CurrentUser.set(auth);
 
-        return profileService.update(currentUser, request);
+        var response = profileService.updateProfile(currentUser, request);
+
+        return ResponseEntity.ok(response);
     }
 
 
@@ -70,7 +75,10 @@ public class ProfileController {
 
         var currentUser = CurrentUser.set(auth);
 
-        return profileService.changePassword(currentUser, request);
+        profileService.changePassword(currentUser, request);
+
+        // 204 No Content — change succeeded, nothing else to return
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
 }

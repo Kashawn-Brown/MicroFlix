@@ -44,7 +44,7 @@ public class ProfileService {
      *
      * For now, only displayName is supported.
      */
-    public ProfileMeResponse update(CurrentUser currentUser, UpdateProfileRequest request) {
+    public ProfileMeResponse updateProfile(CurrentUser currentUser, UpdateProfileRequest request) {
 
         // find current user by email
         var user = users.findByEmail(currentUser.email())
