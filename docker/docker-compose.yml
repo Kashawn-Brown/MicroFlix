@@ -22,11 +22,10 @@ services:
     depends_on:
       - user-db
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://user-db:5432/userdb
-      SPRING_DATASOURCE_USERNAME: user
-      SPRING_DATASOURCE_PASSWORD: user
-      EUREKA_CLIENT_ENABLED: "false"                        # Disable Eureka when running in Docker
-      SPRING_CLOUD_DISCOVERY_ENABLED: "false"               # Disable Eureka when running in Docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/userdb
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=user
+      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/      # Eureka client: point to discovery server in Docker
     ports:
       - "8082:8082"                     # host:container
 
@@ -38,12 +37,21 @@ services:
     depends_on:
       - user-service
     environment:    # Set env variables for service
-      # Point the gateway at the user-service container for routing
-      - USER_SERVICE_URI=http://user-service:8082
-      # Optional but recommended while Eureka server is NOT running in Docker
-      - EUREKA_CLIENT_ENABLED=false
+      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/          # Route resolution via Eureka:
     ports:
       - "8081:8081"
+
+  discovery:
+    build:
+      context: ..
+      dockerfile: modules/discovery/Dockerfile
+    container_name: discovery
+    ports:
+      - "8761:8761"
+    environment:
+      # Standalone Eureka server – no need to register with other peers
+      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
+      - EUREKA_CLIENT_FETCH_REGISTRY=false
 
 volumes:
   pg_user_data:

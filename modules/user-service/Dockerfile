@@ -33,10 +33,11 @@ WORKDIR /app
 # Take the file from the build stage’s filesystem and copy it into the runtime stage’s filesystem
 COPY --from=build /app/modules/user-service/target/*.jar app.jar
 
+# Expose the port
+EXPOSE 8082
+
 # Optional: JVM options (memory, etc.) can be injected via JAVA_OPTS
 ENV JAVA_OPTS=""
-
-EXPOSE 8082
 
 # Start the user-service
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
