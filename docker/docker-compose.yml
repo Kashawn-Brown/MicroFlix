@@ -13,7 +13,6 @@ services:
       - pg_user_data:/var/lib/postgresql
       # named volume so data persists even if container is removed
 
-
   user-service:                         # User Service (Container)
     build:
       context: ..                       # repo root (one level up from docker/)
@@ -30,6 +29,21 @@ services:
       SPRING_CLOUD_DISCOVERY_ENABLED: "false"               # Disable Eureka when running in Docker
     ports:
       - "8082:8082"                     # host:container
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: modules/gateway/Dockerfile
+    container_name: gateway
+    depends_on:
+      - user-service
+    environment:    # Set env variables for service
+      # Point the gateway at the user-service container for routing
+      - USER_SERVICE_URI=http://user-service:8082
+      # Optional but recommended while Eureka server is NOT running in Docker
+      - EUREKA_CLIENT_ENABLED=false
+    ports:
+      - "8081:8081"
 
 volumes:
   pg_user_data:

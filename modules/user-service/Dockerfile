@@ -19,6 +19,8 @@ RUN mvn clean package -DskipTests
 
 # Result: Maven compiles user-service and produces a JAR at: /app/modules/user-service/target/<something>.jar
 
+
+
 # --- Runtime stage: small image just to run the JAR ---
 
 # Start a new, smaller image that just has: Alpine Linux (small OS), Java 21 runtime (JRE -> to run JARs; no compiler)
@@ -36,4 +38,5 @@ ENV JAVA_OPTS=""
 
 EXPOSE 8082
 
+# Start the user-service
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
