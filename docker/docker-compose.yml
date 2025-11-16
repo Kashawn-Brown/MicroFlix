@@ -1,5 +1,5 @@
 services:
-  db:                                 # Database Service (Container)
+  user-db:                                 # Database Service (Container)
     image: postgres:18
     container_name: pg-user          # optional, keeps your old name
     restart: unless-stopped
@@ -21,9 +21,9 @@ services:
     container_name: user-service
     restart: unless-stopped
     depends_on:
-      - db
+      - user-db
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/userdb
+      SPRING_DATASOURCE_URL: jdbc:postgresql://user-db:5432/userdb
       SPRING_DATASOURCE_USERNAME: user
       SPRING_DATASOURCE_PASSWORD: user
       EUREKA_CLIENT_ENABLED: "false"                        # Disable Eureka when running in Docker
