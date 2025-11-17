@@ -9,21 +9,21 @@ import java.util.List;
 @Service
 public class MovieService {
 
-    private final MovieRepository movies;
+    private final MovieRepository movieRepository;
 
-    public MovieService(MovieRepository movies) {
-        this.movies = movies;
+    public MovieService(MovieRepository movieRepository) {
+        this.movieRepository = movieRepository;
     }
 
     public List<MovieResponse> getAllMovies() {
-        return movies.findAll()
+        return movieRepository.findAll()
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     public MovieResponse getMovie(Long id) {
-        Movie movie = movies.findById(id)
+        Movie movie = movieRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No movie with id: " + id + " found"));
 
         return toResponse(movie);
@@ -38,7 +38,7 @@ public class MovieService {
         movie.setRuntime(request.runtime());
         movie.setTmdbId(request.tmdbId());
 
-        var newMovie = movies.save(movie);
+        var newMovie = movieRepository.save(movie);
 
         return toResponse(newMovie);
     }
