@@ -10,8 +10,8 @@ WORKDIR /app
 COPY pom.xml .
 COPY modules ./modules
 
-# Move into the discovery module then build it
-WORKDIR /app/modules/discovery
+# Move into the movie service module and build it
+WORKDIR /app/modules/movie-service
 RUN mvn clean package -DskipTests
 
 
@@ -23,11 +23,11 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# Copy the built discovery jar from the build stage
-COPY --from=build /app/modules/discovery/target/discovery-*.jar app.jar
+# Copy the built movie service jar from the build stage
+COPY --from=build /app/modules/movie-service/target/movie-service-*.jar app.jar
 
 # Expose the port
-EXPOSE 8761
+EXPOSE 8083
 
 ENV JAVA_OPTS=""
 

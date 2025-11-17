@@ -1,4 +1,33 @@
 services:
+
+  discovery:             # Discovery
+    build:
+      context: ..
+      dockerfile: modules/discovery/Dockerfile
+    container_name: discovery
+    ports:
+      - "8761:8761"
+    environment:
+      # Standalone Eureka server – no need to register with other peers
+      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
+      - EUREKA_CLIENT_FETCH_REGISTRY=false
+
+
+  gateway:              # Gateway
+    build:
+      context: ..
+      dockerfile: modules/gateway/Dockerfile
+    container_name: gateway
+    depends_on:
+      - discovery
+      - user-service
+      - movie-service
+    environment:    # Set env variables for service
+      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/          # Route resolution via Eureka:
+    ports:
+      - "8081:8081"
+
+
   user-db:                                 # Database Service (Container)
     image: postgres:18
     container_name: pg-user          # optional, keeps your old name
@@ -21,6 +50,7 @@ services:
     restart: unless-stopped
     depends_on:
       - user-db
+      - discovery
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/userdb
       - SPRING_DATASOURCE_USERNAME=user
@@ -29,29 +59,27 @@ services:
     ports:
       - "8082:8082"                     # host:container
 
-  gateway:
-    build:
-      context: ..
-      dockerfile: modules/gateway/Dockerfile
-    container_name: gateway
-    depends_on:
-      - user-service
-    environment:    # Set env variables for service
-      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/          # Route resolution via Eureka:
-    ports:
-      - "8081:8081"
 
-  discovery:
+  movie-service: # Movie Service (Container)
     build:
-      context: ..
-      dockerfile: modules/discovery/Dockerfile
-    container_name: discovery
-    ports:
-      - "8761:8761"
+      context: ..                       # repo root (one level up from docker/)
+      dockerfile: modules/movie-service/Dockerfile               # path from repo root to the Dockerfile
+    container_name: movie-service
+    restart: unless-stopped
+    depends_on:
+      - discovery
     environment:
-      # Standalone Eureka server – no need to register with other peers
-      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
-      - EUREKA_CLIENT_FETCH_REGISTRY=false
+#      - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/userdb
+#      - SPRING_DATASOURCE_USERNAME=user
+#      - SPRING_DATASOURCE_PASSWORD=user
+      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/      # Eureka client: point to discovery server in Docker
+    ports:
+      - "8083:8083"                     # host:container
+
+
+
+
+
 
 volumes:
   pg_user_data:

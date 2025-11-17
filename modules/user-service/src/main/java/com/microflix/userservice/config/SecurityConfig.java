@@ -28,7 +28,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter) throws Exception {
         http.csrf(csrf -> csrf.disable());                              // disabling CSRF (for stateless API)
         http.authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**", "/actuator/**", "/act/**").permitAll()     // Permitting so users can register/login and we can health-check
+                .requestMatchers("/api/v1/auth/**", "api/v1/users/health", "/actuator/**", "/act/**").permitAll()     // Permitting so users can register/login and we can health-check
                 .requestMatchers("/api/**").authenticated()                             // Everything else under /api/** will require authentication
                 .anyRequest().permitAll()                                                        // leaving everything else open for now
         );
