@@ -28,7 +28,7 @@ services:
       - "8081:8081"
 
 
-  user-db:                                 # Database Service (Container)
+  user-db:                                 # User Database Service (Container)
     image: postgres:18
     container_name: pg-user          # optional, keeps your old name
     restart: unless-stopped
@@ -60,19 +60,34 @@ services:
       - "8082:8082"                     # host:container
 
 
-  movie-service: # Movie Service (Container)
+  movie-db:                         # Movie Database Service (Container)
+    image: postgres:18
+    container_name: pg-movie
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: moviedb
+      POSTGRES_USER: movie
+      POSTGRES_PASSWORD: movie
+    ports:
+      - "5435:5432"
+    volumes:
+      - pg_movie_data:/var/lib/postgresql
+      # named volume so data persists even if container is removed
+
+  movie-service:                    # Movie Service (Container)
     build:
       context: ..                       # repo root (one level up from docker/)
       dockerfile: modules/movie-service/Dockerfile               # path from repo root to the Dockerfile
     container_name: movie-service
     restart: unless-stopped
     depends_on:
+      - movie-db
       - discovery
     environment:
-#      - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/userdb
-#      - SPRING_DATASOURCE_USERNAME=user
-#      - SPRING_DATASOURCE_PASSWORD=user
-      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/      # Eureka client: point to discovery server in Docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://movie-db:5432/moviedb
+      - SPRING_DATASOURCE_USERNAME=movie
+      - SPRING_DATASOURCE_PASSWORD=movie
+      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/      # Eureka config: point to discovery server in Docker
     ports:
       - "8083:8083"                     # host:container
 
@@ -83,6 +98,7 @@ services:
 
 volumes:
   pg_user_data:
+  pg_movie_data:
 
 
 

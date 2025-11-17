@@ -1,9 +1,23 @@
 server:
   port: 8083
 
-  spring:
-    application:
-      name: movie-service
+spring:
+  application:
+    name: movie-service
+  datasource:
+    url: jdbc:postgresql://localhost:5434/moviedb      # where to connect (JDBC connection string to postgres db)
+    username: movie
+    password: movie
+    jpa:
+      hibernate:
+        ddl-auto: validate                            # Don't let Hibernate auto-create/change tables. (verify schema)
+      properties:
+        hibernate.jdbc.time_zone: UTC                 # Treat timestamps consistently in UTC
+        hibernate.format_sql: true                    # Pretty-print SQL in logs for easier debugging
+    flyway:
+      enabled: true                                   # Turn Flyway on for this service (run versioned SQL at startup)
+      locations: classpath:db/migration               # Where Flyway should look for migration files on the classpath (where V1__*.sql lives)
+
 
 
 eureka:
