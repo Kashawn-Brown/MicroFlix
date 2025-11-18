@@ -1,7 +1,8 @@
 
 ---
 
-## 🐳 Local Dev: Running `user-service` + Postgres with Docker Compose
+# 🐳 Local Dev: Running `user-service` + Postgres with Docker Compose
+
 This setup runs the **user-service** and **Postgres 18** in Docker, so you don’t need a local DB installed.
 
 ### Prerequisites
@@ -18,8 +19,10 @@ From `docker/docker-compose.yml`, I have two main services:
     * Image: `postgres:18`
     * Host port: `5434` → container port `5432`
     * Database: `userdb`
+    * Main table: `users`
     * Username/password: `user` / `user`
     * Data is stored in a named volume `pg_user_data`, so it survives container restarts.
+    * Schema created by Flyway migration `V1__init_users.sql`
 
 * **user-service**
 
@@ -55,14 +58,16 @@ At this point, `user-service` is available at:
 
 * `http://localhost:8082`
 
-### Sanity check: basic auth & profile flow
+---
 
-I use these calls to confirm everything is working end-to-end.
+## API endpoints
+
+I use these calls to confirm everything is working end-to-end via the gateway.
 
 ### **1️⃣ Register**
 
 ```bash
-curl -X POST http://localhost:8082/api/v1/auth/register \
+curl -X POST http://localhost:8081/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "test@example.com",
@@ -76,7 +81,7 @@ I expect a `200 OK` with a JSON body that includes a JWT `token` and basic user 
 ### **2️⃣ Login**
 
 ```bash
-curl -X POST http://localhost:8082/api/v1/auth/login \
+curl -X POST http://localhost:8081/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "test@example.com",
@@ -89,7 +94,7 @@ From this response, I grab the `token` field.
 ### **3️⃣ Get the current user (`/users/me`)**
 
 ```bash
-curl http://localhost:8082/api/v1/users/me \
+curl http://localhost:8081/api/v1/users/me \
   -H "Authorization: Bearer <PASTE_TOKEN_HERE>"
 ```
 
@@ -188,5 +193,39 @@ As I add new behavior (for example, new profile fields or more detailed error ha
 
 * If tests fail with missing classes or beans, I make sure I’m running from the project root with `./mvnw test` so Maven picks up the full multi-module context.
 * If a test fails unexpectedly, I check the stack trace for which service or controller threw the exception and update either the test or the implementation accordingly.
+
+---
+
+## Error handling
+
+* Invalid credentials:
+
+  * When I call `/api/v1/auth/login` with a bad email/password combination, the service returns an error response.
+  * The controller and security layer work together so that invalid credentials don’t leak details about which part was wrong (email vs password).
+
+* Duplicate registration:
+
+  * When I try to register with an email that already exists, the service rejects the request and does not create a second user.
+  * This keeps the `email` field unique and avoids inconsistent account state.
+
+* Unauthorized access:
+
+  * All profile-related endpoints (like `/api/v1/users/me`, update profile, change password) are protected by JWT-based auth.
+  * If I hit these endpoints without a valid `Authorization: Bearer <token>` header, the service returns an appropriate 401-style response instead of user data.
+
+As I refine the API, the goal is to keep controller code simple and move more of the error mapping into shared handlers so clients see clear, consistent error formats across endpoints.
+
+---
+
+## Future plans
+
+Later, I plan to extend user-service to:
+
+* Add user-facing flows like password reset, email verification, and possibly multi-factor auth.
+* Standardize error responses (using `ProblemDetail` or a shared error envelope) so all services return a consistent JSON format for failures.
+* Introduce more fine-grained roles and permissions once there are admin/moderation features.
+* Expose additional profile fields and preferences that other services (like ratings or recommendations) can use.
+
+These are intentionally kept out of the initial MVP so the core auth + profile flows stay stable and easy to reason about first.
 
 ---
