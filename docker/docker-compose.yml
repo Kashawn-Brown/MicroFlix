@@ -87,7 +87,12 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://movie-db:5432/moviedb
       - SPRING_DATASOURCE_USERNAME=movie
       - SPRING_DATASOURCE_PASSWORD=movie
+
       - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/      # Eureka config: point to discovery server in Docker
+
+      - TMDB_BASE_URL=https://api.themoviedb.org/3
+      - TMDB_API_KEY=${TMDB_API_KEY}                              # Retrieve from .env
+      - MOVIE_TMDB_SEED_ENABLED=${MOVIE_TMDB_SEED_ENABLED}
     ports:
       - "8083:8083"                     # host:container
 

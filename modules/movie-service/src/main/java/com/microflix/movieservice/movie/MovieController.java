@@ -3,7 +3,6 @@ package com.microflix.movieservice.movie;
 import com.microflix.movieservice.movie.dto.CreateMovieRequest;
 import com.microflix.movieservice.movie.dto.MovieResponse;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
