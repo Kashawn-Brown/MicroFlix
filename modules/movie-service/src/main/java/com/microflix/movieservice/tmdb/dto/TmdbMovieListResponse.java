@@ -1,4 +1,4 @@
-package com.microflix.movieservice.movie.tmdb;
+package com.microflix.movieservice.tmdb.dto;
 
 import java.util.List;
 

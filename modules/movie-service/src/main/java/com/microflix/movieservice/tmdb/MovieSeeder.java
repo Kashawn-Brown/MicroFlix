@@ -1,8 +1,10 @@
-package com.microflix.movieservice.movie.tmdb;
+package com.microflix.movieservice.tmdb;
 
 
 import com.microflix.movieservice.movie.Movie;
 import com.microflix.movieservice.movie.MovieRepository;
+import com.microflix.movieservice.tmdb.dto.TmdbMovieListResponse;
+import com.microflix.movieservice.tmdb.dto.TmdbMovieResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;

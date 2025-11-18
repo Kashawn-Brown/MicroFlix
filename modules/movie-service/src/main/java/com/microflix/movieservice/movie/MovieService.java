@@ -1,5 +1,6 @@
 package com.microflix.movieservice.movie;
 
+import com.microflix.movieservice.common.errors.MovieNotFoundException;
 import com.microflix.movieservice.movie.dto.CreateMovieRequest;
 import com.microflix.movieservice.movie.dto.MovieResponse;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,7 @@ public class MovieService {
 
     public MovieResponse getMovie(Long id) {
         Movie movie = movieRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No movie with id: " + id + " found"));
+                .orElseThrow(() -> new MovieNotFoundException(id));
 
         return toResponse(movie);
     }

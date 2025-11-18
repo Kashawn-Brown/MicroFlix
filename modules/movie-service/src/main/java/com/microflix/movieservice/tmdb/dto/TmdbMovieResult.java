@@ -1,4 +1,4 @@
-package com.microflix.movieservice.movie.tmdb;
+package com.microflix.movieservice.tmdb.dto;
 
 // Represents a single movie entry from TMDb's movie list responses
 public record TmdbMovieResult(
