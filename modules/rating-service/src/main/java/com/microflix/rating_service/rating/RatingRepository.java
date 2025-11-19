@@ -1,4 +1,4 @@
-package com.microflix.rating_service.ratings;
+package com.microflix.rating_service.rating;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

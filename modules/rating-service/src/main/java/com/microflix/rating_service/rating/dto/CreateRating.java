@@ -1,4 +1,4 @@
-package com.microflix.rating_service.ratings.dto;
+package com.microflix.rating_service.rating.dto;
 
 import java.util.UUID;
 

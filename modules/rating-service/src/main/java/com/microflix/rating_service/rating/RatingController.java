@@ -1,8 +1,8 @@
-package com.microflix.rating_service.ratings;
+package com.microflix.rating_service.rating;
 
-import com.microflix.rating_service.ratings.dto.CreateRating;
-import com.microflix.rating_service.ratings.dto.RatingResponse;
-import com.microflix.rating_service.ratings.dto.UpdateRating;
+import com.microflix.rating_service.rating.dto.CreateRating;
+import com.microflix.rating_service.rating.dto.RatingResponse;
+import com.microflix.rating_service.rating.dto.UpdateRating;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

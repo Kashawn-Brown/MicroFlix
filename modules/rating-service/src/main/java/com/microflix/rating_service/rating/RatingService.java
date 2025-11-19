@@ -1,8 +1,9 @@
-package com.microflix.rating_service.ratings;
+package com.microflix.rating_service.rating;
 
-import com.microflix.rating_service.ratings.dto.CreateRating;
-import com.microflix.rating_service.ratings.dto.RatingResponse;
-import com.microflix.rating_service.ratings.dto.UpdateRating;
+import com.microflix.rating_service.common.errors.RatingNotFoundException;
+import com.microflix.rating_service.rating.dto.CreateRating;
+import com.microflix.rating_service.rating.dto.RatingResponse;
+import com.microflix.rating_service.rating.dto.UpdateRating;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,7 +19,15 @@ public class RatingService {
     }
 
     public RatingResponse createRating(CreateRating request) {
-        var rating = new Rating();
+
+        // 1) Check if a rating already exists for this user + movie
+        var existing = ratingRepository.findByUserIdAndMovieId(
+                request.userId(),
+                request.movieId()
+        );
+
+        // 2) If it exists update it; otherwise create a new one
+        var rating = existing.orElseGet(Rating::new);           // Rating::new is a method reference, just a shorter way of writing: () -> new Rating()
 
         // compute rating out of 100 to store as an integer
         int rate  = toRatingTimesTen(request.rate());
@@ -38,7 +47,7 @@ public class RatingService {
         Long movieId = request.movieId();
 
         var rating = ratingRepository.findByUserIdAndMovieId(userId, movieId)
-                .orElseThrow(() -> new IllegalArgumentException("Rating cannot be found"));
+                .orElseThrow(() -> new RatingNotFoundException("Rating cannot be found"));
 
         // compute rating out of 100 to store as an integer
         int rate  = toRatingTimesTen(request.rate());
@@ -71,7 +80,7 @@ public class RatingService {
 
     public RatingResponse getUserRatingForMovie(Long movieId, UUID userId) {
         var rating = ratingRepository.findByUserIdAndMovieId(userId, movieId)
-                .orElseThrow(() -> new IllegalArgumentException("User " + userId + " has not yet rated this movie"));
+                .orElseThrow(() -> new RatingNotFoundException("Rating for user " + userId + " and movie " + movieId + " was not found"));
 
         return toResponse(rating);
     }
@@ -79,7 +88,7 @@ public class RatingService {
 
     public RatingResponse getRating(Long ratingId) {
         var rating = ratingRepository.findById(ratingId)
-                .orElseThrow(() -> new IllegalArgumentException("Rating " + ratingId + " does not exist"));
+                .orElseThrow(() -> new RatingNotFoundException("Rating " + ratingId + " was not found"));
 
         return toResponse(rating);
     }
