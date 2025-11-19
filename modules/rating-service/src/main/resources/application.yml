@@ -1,13 +1,13 @@
 server:
-  port: 8083
+  port: 8084
 
 spring:
   application:
-    name: movie-service
+    name: rating-service
   datasource:
-    url: jdbc:postgresql://localhost:5435/moviedb      # where to connect (JDBC connection string to postgres db)
-    username: movie
-    password: movie
+    url: jdbc:postgresql://localhost:5436/ratingdb      # where to connect (JDBC connection string to postgres db)
+    username: rating
+    password: rating
     jpa:
       hibernate:
         ddl-auto: validate                            # Don't let Hibernate auto-create/change tables. (verify schema)
@@ -30,13 +30,3 @@ management:
     web:
       exposure:
         include: health,info
-
-
-tmdb:
-  base-url: https://api.themoviedb.org/3
-  # api-key will come from environment (TMDB_API_KEY)
-
-movie:
-  tmdb:
-    seed:
-      enabled: false   # default: do NOT seed
