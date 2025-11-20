@@ -16,8 +16,10 @@ import java.util.UUID;
 public class AuthService {
 
     private final UserRepository users;
-    private final PasswordEncoder encoder;
-    private final JwtService jwt;
+
+    // Auto-injects Beans from security config
+    private final PasswordEncoder encoder;      // injected bean for hashing/verifying passwords
+    private final JwtService jwt;               // injected bean for issuing and validating JWTs
 
     public AuthService(UserRepository users, PasswordEncoder encoder, JwtService jwt) {
         this.users = users;

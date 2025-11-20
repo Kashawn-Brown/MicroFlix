@@ -15,8 +15,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 // Runs once per request, looks for a Bearer token, and if valid,
 // sets the CurrentUser into Spring Security's context.
@@ -38,28 +36,34 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // Retrieving Authorization header
-        String header = request.getHeader("Authorization");
+        try {// Retrieving Authorization header
+            String header = request.getHeader("Authorization");
 
-        // If token present
-        if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
+            // If token present
+            if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
 
-            // Strip "Bearer " prefix
-            String token = header.substring(7);
+                // Strip "Bearer " prefix
+                String token = header.substring(7);
 
-            // Convert the JWT into CurrentUser model
-            CurrentUser currentUser = jwtVerifier.verify(token);
+                // Convert the JWT into CurrentUser model
+                CurrentUser currentUser = jwtVerifier.verify(token);
 
-            // Map roles ("USER") to Spring authorities ("ROLE_USER")
-            List<SimpleGrantedAuthority> authorities = currentUser.roles().stream()
-                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                    .toList();
+                // Map roles ("USER") to Spring authorities ("ROLE_USER")
+                List<SimpleGrantedAuthority> authorities = currentUser.roles().stream()
+                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                        .toList();
 
-            // Build an authentication object with CurrentUser as the principal
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(currentUser, null, authorities);
+                // Build an authentication object with CurrentUser as the principal
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(currentUser, null, authorities);
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
+        } catch (Exception ex) {
+            // For now log and continue as anonymous.
+            // SecurityConfig will decide if anonymous is allowed for the endpoint.
+            log.warn("Failed to authenticate JWT: {}", ex.getMessage());
+            SecurityContextHolder.clearContext();
         }
 
         // Always continue filter chain

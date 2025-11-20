@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * - 400 for bad input (our IllegalArgumentException + @Valid errors)
  * - 500 for everything else (hide internals from clients)
  */
+
 @RestControllerAdvice
 public class ErrorAdvice {
 
