@@ -7,7 +7,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5436/ratingdb      # where to connect (JDBC connection string to postgres db)
     username: rating
-    password: rating
+    password: ${RATING_DB_PASSWORD:rating}
     jpa:
       hibernate:
         ddl-auto: validate                            # Don't let Hibernate auto-create/change tables. (verify schema)

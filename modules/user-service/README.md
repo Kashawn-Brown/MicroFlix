@@ -1,9 +1,14 @@
 
 ---
 
-# 🐳 Local Dev: Running `user-service` + Postgres with Docker Compose
+# User Service
 
-This setup runs the **user-service** and **Postgres 18** in Docker, so you don’t need a local DB installed.
+This is the **user-service** for Microflix. It handles user registration, login with JWT, 
+and profile management so other services can reliably identify and trust the current user.
+
+It utilizes: Spring Boot 3, Java 21, Postgres, Flyway, and a thin controller + service + repository stack.
+
+This setup runs the **user-service** and **Postgres 18** database in Docker along with the rest of the Microflix stack, so you don’t need a local DB installed.
 
 ### Prerequisites
 
@@ -29,21 +34,59 @@ From `docker/docker-compose.yml`, I have two main services:
     * Built from `modules/user-service/Dockerfile` (multi-stage: Maven build + slim Java 21 runtime).
     * Exposed on `http://localhost:8082`
     * Connects to Postgres using `jdbc:postgresql://user-db:5432/userdb`.
-    * In this Docker setup I disable Eureka via env vars:
+    * Registers with Eureka so the **gateway** can route `/api/v1/users/**` & `/api/v1/auth/**`calls to it.
 
-        * `EUREKA_CLIENT_ENABLED=false`
-        * `SPRING_CLOUD_DISCOVERY_ENABLED=false`
+Other services (for context):
 
-### How I start the stack
+- `discovery` on `http://localhost:8761` (Eureka dashboard)
+- `gateway` on `http://localhost:8081` (API entrypoint)
 
-From the `docker/` directory:
+---
+
+## Tech stack
+
+- Java 21
+- Spring Boot 3.x
+- Spring Data JPA (Postgres)
+- Flyway for database migrations
+- JUnit 5 + Mockito for tests
+- Docker + Docker Compose for local infra
+
+---
+
+## Database schema
+
+On startup, Flyway runs `V1__init_users.sql` and creates a `users` table with:
+
+- `id UUID PRIMARY KEY` – stable user identifier used across the system
+- `email VARCHAR(255) NOT NULL UNIQUE` – unique email used for login
+- `password_hash VARCHAR(72) NOT NULL` – bcrypt (or similar) hash of the user’s password
+- `display_name VARCHAR(100)` – optional name shown in the UI
+- `roles VARCHAR(100) NOT NULL DEFAULT 'USER'` – comma-separated roles (e.g. `USER`, `ADMIN`)
+- `is_active BOOLEAN NOT NULL DEFAULT TRUE` – soft-active flag for disabling accounts
+- `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` – when the user was created
+- `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` – last time the user record was updated
+- `last_login_at TIMESTAMPTZ` – timestamp of the last successful login (nullable)
+
+There is an index on `email` (`idx_users_email`) so login and user lookups by email stay fast as the table grows.
+
+---
+
+## How I start the stack
+
+###### Running locally with Docker Compose:
+
+From the repo root there is a `docker/` directory that orchestrates all services.
+
+From there:
 
 ```bash
 # Stop any old containers for this compose file
 docker compose down
 
-# Build images and start Postgres + user-service
+# Build images and start the full stack (discovery, gateway, services, and DBs)
 docker compose up --build
+
 # (or: docker compose up --build user-db user-service)
 ```
 
@@ -53,10 +96,12 @@ Once things are up, I expect to see logs for:
   `database system is ready to accept connections`
 * `user-service`: the Spring Boot startup banner + Flyway migrations +
   “`Started UserServiceApplication...`”
+* \+ The rest of the Microflix stack starting up
 
-At this point, `user-service` is available at:
+At this point:
 
-* `http://localhost:8082`
+* `user-service` is available directly at: `http://localhost:8082`
+* Through the gateway, user endpoints live under: `http://localhost:8081/api/v1/users` or `http://localhost:8081/api/v1/auth`
 
 ---
 
@@ -64,7 +109,7 @@ At this point, `user-service` is available at:
 
 I use these calls to confirm everything is working end-to-end via the gateway.
 
-### **1️⃣ Register**
+### **Register a user**
 
 ```bash
 curl -X POST http://localhost:8081/api/v1/auth/register \
@@ -78,7 +123,7 @@ curl -X POST http://localhost:8081/api/v1/auth/register \
 
 I expect a `200 OK` with a JSON body that includes a JWT `token` and basic user info.
 
-### **2️⃣ Login**
+### **Login user**
 
 ```bash
 curl -X POST http://localhost:8081/api/v1/auth/login \
@@ -91,7 +136,7 @@ curl -X POST http://localhost:8081/api/v1/auth/login \
 
 From this response, I grab the `token` field.
 
-### **3️⃣ Get the current user (`/users/me`)**
+### **Get the current user**
 
 ```bash
 curl http://localhost:8081/api/v1/users/me \

@@ -12,6 +12,7 @@ Current modules:
 
 - `modules/user-service` – user registration, login (JWT), and profile (`/users/me`, update profile, change password).
 - `modules/movie-service` – movie metadata service with basic CRUD and optional TMDb-based seeding.
+- `modules/rating-service` – movie ratings service (1–10 scale with 0.1 increments; per-user per-movie ratings).
 - `modules/gateway` – Spring Cloud Gateway entrypoint for the API.
 - `modules/discovery` – Eureka discovery server.
 - `docker/` – Docker Compose setup for running the local stack.
@@ -33,10 +34,13 @@ I use Docker Compose to run the core services together:
 
 - `discovery` (Eureka server) on port **8761**
 - `gateway` (API entrypoint) on port **8081**
-- `user-service` on port **8082** (behind gateway)
+- `user-service` on port **8082** (behind gateway at `/api/v1/users`)
 - `user-db` (Postgres 18) with a named volume for data
 - `movie-service` on port **8083** (behind gateway at `/api/v1/movies`)
 - `movie-db` (Postgres 18) with its own named volume
+- `rating-service` on port **8084** (behind gateway at `/api/v1/ratings`)
+- `rating-db` (Postgres 18) with its own named volume
+
 
 From the `docker/` directory:
 

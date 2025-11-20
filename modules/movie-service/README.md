@@ -1,9 +1,16 @@
 
----
+#  Movie Service
 
-# 🐳 Local Dev: Running `movie-service` + Postgres with Docker Compose
 
-This setup runs the **movie-service** and its **Postgres 18** database in Docker, along with the rest of the Microflix stack (discovery + gateway + user-service). I don’t need a local Postgres installed.
+This is the **movie-service** for Microflix. It manages core movie metadata 
+(create, list, and fetch movies) and can optionally seed realistic data from 
+TMDb so the rest of the platform has a solid catalog to work with.
+
+It follows the same patterns as `user-service`: Spring Boot 3, Java 21, Postgres, Flyway, 
+and a thin controller + service + repository stack.
+
+This setup runs the **movie-service** and **Postgres 18** database in Docker along with the 
+rest of the Microflix stack, so you don’t need a local DB installed.
 
 ### Prerequisites
 
@@ -36,26 +43,61 @@ Other services (for context):
 
 - `discovery` on `http://localhost:8761` (Eureka dashboard)
 - `gateway` on `http://localhost:8081` (API entrypoint)
-- `user-service` + `user-db` (auth/profile)
 
-### How I start the stack
+---
 
-From the `docker/` directory:
+## Tech stack
+
+- Java 21
+- Spring Boot 3.x
+- Spring Data JPA (Postgres)
+- Flyway for database migrations
+- JUnit 5 + Mockito for tests
+- Docker + Docker Compose for local infra
+
+---
+
+## Database schema
+
+On startup, Flyway runs `V1__create_movies_table.sql` and creates a `movies` table with:
+
+- `id BIGSERIAL PRIMARY KEY` – internal movie identifier used by the movie-service and other services
+- `title VARCHAR(255) NOT NULL` – movie title
+- `overview TEXT` – optional description / synopsis
+- `release_year INT` – optional release year (e.g. 1999)
+- `runtime INT` – optional runtime in minutes
+- `tmdb_id BIGINT` – optional reference to the TMDb movie id for syncing/seeding
+- `created_at TIMESTAMPTZ NOT NULL` – when the movie row was created
+- `updated_at TIMESTAMPTZ NOT NULL` – when the movie row was last updated
+
+The `tmdb_id` field lets the service link local movies to TMDb data. It is currently nullable so I can create local-only movies as well as TMDb-backed ones.
+
+---
+
+## How I start the stack
+
+###### Running locally with Docker Compose:
+
+From the repo root there is a `docker/` directory that orchestrates all services.
+
+From there:
 
 ```bash
 # Stop any old containers for this compose file
 docker compose down
 
-# Build images and start the full stack (discovery, gateway, user-service, movie-service, and DBs)
+# Build images and start the full stack (discovery, gateway, services, and DBs)
 docker compose up --build
+
+# (or: docker compose up --build movie-db movie-service)
 ````
 
 Once things are up, I expect to see logs for:
 
 * `movie-db`:
   `database system is ready to accept connections`
-* `movie-service`: Spring Boot startup banner, Flyway validation, and
-  `Started MovieServiceApplication...`
+* `movie-service`: Spring Boot startup banner + Flyway validation + `Started MovieServiceApplication...`
+* \+ The rest of the Microflix stack starting up
 
 At this point:
 
@@ -68,7 +110,7 @@ At this point:
 
 I use these calls to confirm everything is working end-to-end via the gateway.
 
-### **1️⃣ List all movies**
+### **List all movies**
 
 ```bash
 curl http://localhost:8081/api/v1/movies
@@ -91,7 +133,7 @@ If I’ve seeded data (see TMDb seeding below) or created some movies manually, 
 ]
 ```
 
-### **2️⃣ Get a specific movie by id**
+### **Get a specific movie by id**
 
 ```bash
 curl http://localhost:8081/api/v1/movies/1
@@ -109,7 +151,7 @@ curl http://localhost:8081/api/v1/movies/1
 }
 ```
 
-### **3️⃣ Create a movie manually**
+### **Create a movie manually**
 
 ```bash
 curl -X POST http://localhost:8081/api/v1/movies \
