@@ -62,7 +62,7 @@ class AuthServiceTest {
             return u;
         });
 
-        when(jwt.createToken("test@example.com", "USER")).thenReturn("fake-jwt-token");
+        when(jwt.createToken(any(User.class))).thenReturn("fake-jwt-token");
 
         // act
         AuthResponse response = authService.register(request);
@@ -113,7 +113,7 @@ class AuthServiceTest {
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(existing));
         when(encoder.matches("password123", "hashed-password")).thenReturn(true);
-        when(jwt.createToken("user@example.com", "USER")).thenReturn("login-jwt-token");
+        when(jwt.createToken(existing)).thenReturn("login-jwt-token");
 
         // act
         AuthResponse response = authService.login(request);
@@ -151,6 +151,6 @@ class AuthServiceTest {
 
         assertEquals("Invalid email or password", ex.getMessage());
         verify(users, never()).save(existing);
-        verify(jwt, never()).createToken(anyString(), anyString());
+        verify(jwt, never()).createToken(any(User.class));
     }
 }

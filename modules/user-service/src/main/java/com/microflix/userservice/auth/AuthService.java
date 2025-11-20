@@ -49,7 +49,7 @@ public class AuthService {
         users.save(user);
 
         // Generate JWT
-        var token = jwt.createToken(user.getEmail(), user.getRoles());
+        var token = jwt.createToken(user);
 
         return new AuthResponse(
                 token, user.getEmail(), user.getDisplayName(), user.getRoles()
@@ -86,7 +86,7 @@ public class AuthService {
         users.save(user);
 
         // Generate JWT
-        var token = jwt.createToken(user.getEmail(), user.getRoles());
+        var token = jwt.createToken(user);
 
         return new AuthResponse(
                 token, user.getEmail(), user.getDisplayName(), user.getRoles()
