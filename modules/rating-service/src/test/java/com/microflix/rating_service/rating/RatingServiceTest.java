@@ -1,9 +1,6 @@
 package com.microflix.rating_service.rating;
 
 import com.microflix.rating_service.common.errors.RatingNotFoundException;
-import com.microflix.rating_service.rating.Rating;
-import com.microflix.rating_service.rating.RatingRepository;
-import com.microflix.rating_service.rating.RatingService;
 import com.microflix.rating_service.rating.dto.CreateRating;
 import com.microflix.rating_service.rating.dto.RatingResponse;
 import com.microflix.rating_service.rating.dto.UpdateRating;
@@ -40,7 +37,8 @@ class RatingServiceTest {
         Long movieId = 10L;
         double score = 8.1;
 
-        var request = new CreateRating(userId, movieId, score);
+        // DTO no longer carries userId; only movieId + rate
+        var request = new CreateRating(movieId, score);
 
         when(ratings.findByUserIdAndMovieId(userId, movieId))
                 .thenReturn(Optional.empty());   // no existing rating for this pair
@@ -62,8 +60,8 @@ class RatingServiceTest {
             return r;
         });
 
-        // act
-        RatingResponse response = ratingService.createRating(request);
+        // act - service now takes userId explicitly
+        RatingResponse response = ratingService.createRating(userId, request);
 
         // assert
         assertNotNull(response);
@@ -101,10 +99,11 @@ class RatingServiceTest {
 
         when(ratings.save(any(Rating.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var request = new CreateRating(userId, movieId, 9.5);
+        // DTO now only has movieId + rate
+        var request = new CreateRating(movieId, 9.5);
 
         // act
-        RatingResponse response = ratingService.createRating(request);
+        RatingResponse response = ratingService.createRating(userId, request);
 
         // assert
         assertEquals(5L, response.id());                // should reuse existing id
@@ -123,11 +122,11 @@ class RatingServiceTest {
         UUID userId = UUID.randomUUID();
         Long movieId = 10L;
 
-        var request = new CreateRating(userId, movieId, 0.5); // below 1.0
+        var request = new CreateRating(movieId, 0.5); // below 1.0
 
         // act + assert
         assertThrows(IllegalArgumentException.class,
-                () -> ratingService.createRating(request));
+                () -> ratingService.createRating(userId, request));
     }
 
     @Test
@@ -147,10 +146,11 @@ class RatingServiceTest {
 
         when(ratings.save(any(Rating.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var request = new UpdateRating(userId, movieId, 9.0);
+        // DTO now only has movieId + new score
+        var request = new UpdateRating(movieId, 9.0);
 
         // act
-        RatingResponse response = ratingService.updateRating(request);
+        RatingResponse response = ratingService.updateRating(userId, request);
 
         // assert
         assertEquals(3L, response.id());
@@ -169,14 +169,14 @@ class RatingServiceTest {
         UUID userId = UUID.randomUUID();
         Long movieId = 10L;
 
-        var request = new UpdateRating(userId, movieId, 8.0);
+        var request = new UpdateRating(movieId, 8.0);
 
         when(ratings.findByUserIdAndMovieId(userId, movieId))
                 .thenReturn(Optional.empty());
 
         // act + assert
         assertThrows(RatingNotFoundException.class,
-                () -> ratingService.updateRating(request));
+                () -> ratingService.updateRating(userId, request));
     }
 
     @Test

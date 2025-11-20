@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -26,7 +27,7 @@ public class SecurityConfig {
     // Setting security rules + JWT wiring
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter) throws Exception {
-        http.csrf(csrf -> csrf.disable());                              // disabling CSRF (for stateless API)
+        http.csrf(AbstractHttpConfigurer::disable);      // No CSRF for stateless APIs                        // disabling CSRF (for stateless API)
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/**", "api/v1/users/health", "/actuator/**", "/act/**").permitAll()     // Permitting so users can register/login and we can health-check
                 .requestMatchers("/api/**").authenticated()                             // Everything else under /api/** will require authentication

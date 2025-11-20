@@ -3,8 +3,10 @@ package com.microflix.rating_service.rating;
 import com.microflix.rating_service.rating.dto.CreateRating;
 import com.microflix.rating_service.rating.dto.RatingResponse;
 import com.microflix.rating_service.rating.dto.UpdateRating;
+import com.microflix.rating_service.security.CurrentUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,18 +22,18 @@ public class RatingController {
         this.service = service;
     }
 
-    @PostMapping
-    public ResponseEntity<RatingResponse> createRating(@RequestBody CreateRating request) {
+    @PostMapping            // @AuthenticationPrincipal -> says take the current Authentication, then give me its .getPrincipal() cast to this type (CurrentUser)
+    public ResponseEntity<RatingResponse> createRating(@AuthenticationPrincipal CurrentUser user, @RequestBody CreateRating request) {
 
-        var response = service.createRating(request);
+        var response = service.createRating(user.id(), request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PatchMapping
-    public ResponseEntity<RatingResponse> updateRating(@RequestBody UpdateRating request) {
+    public ResponseEntity<RatingResponse> updateRating(@AuthenticationPrincipal CurrentUser user, @RequestBody UpdateRating request) {
 
-        var response = service.updateRating(request);
+        var response = service.updateRating(user.id(), request);
 
         return ResponseEntity.ok(response);
     }

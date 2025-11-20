@@ -3,6 +3,7 @@ package com.microflix.rating_service.rating;
 import com.microflix.rating_service.rating.dto.CreateRating;
 import com.microflix.rating_service.rating.dto.RatingResponse;
 import com.microflix.rating_service.rating.dto.UpdateRating;
+import com.microflix.rating_service.security.CurrentUser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,20 +33,23 @@ class RatingControllerTest {
     void createRating_returnsCreatedResponse() {
         // arrange
         UUID userId = UUID.randomUUID();
+        CurrentUser currentUser = new CurrentUser(userId, "test@example.com", List.of("USER"));
+
         Long movieId = 10L;
         double score = 8.1;
 
-        var request = new CreateRating(userId, movieId, score);
+        var request = new CreateRating(movieId, score);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         var responseDto = new RatingResponse(
                 1L, userId, movieId, score, now, now
         );
 
-        when(ratingService.createRating(request)).thenReturn(responseDto);
+        // service should be called with userId from JWT + request DTO
+        when(ratingService.createRating(userId, request)).thenReturn(responseDto);
 
         // act
-        ResponseEntity<RatingResponse> response = controller.createRating(request);
+        ResponseEntity<RatingResponse> response = controller.createRating(currentUser, request);
 
         // assert
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
@@ -58,20 +62,22 @@ class RatingControllerTest {
     void updateRating_returnsOkWithUpdatedRating() {
         // arrange
         UUID userId = UUID.randomUUID();
+        CurrentUser currentUser = new CurrentUser(userId, "test@example.com", List.of("USER"));
+
         Long movieId = 10L;
         double newScore = 9.0;
 
-        var request = new UpdateRating(userId, movieId, newScore);
+        var request = new UpdateRating(movieId, newScore);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         var responseDto = new RatingResponse(
                 5L, userId, movieId, newScore, now, now
         );
 
-        when(ratingService.updateRating(request)).thenReturn(responseDto);
+        when(ratingService.updateRating(userId, request)).thenReturn(responseDto);
 
         // act
-        ResponseEntity<RatingResponse> response = controller.updateRating(request);
+        ResponseEntity<RatingResponse> response = controller.updateRating(currentUser, request);
 
         // assert
         assertEquals(HttpStatus.OK, response.getStatusCode());

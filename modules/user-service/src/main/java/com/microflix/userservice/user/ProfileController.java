@@ -37,7 +37,7 @@ public class ProfileController {
 
     // Spring injects Authentication from SecurityContext (set by our JwtAuthFilter)
     @GetMapping("/me")
-    public ResponseEntity<ProfileMeResponse> me(Authentication auth) {            // Authentication is a recognized parameter type -> reads the Authentication from SecurityContextHolder.getContext() and passes it in
+    public ResponseEntity<ProfileMeResponse> me(Authentication auth) { // Authentication is a recognized parameter type -> reads the Authentication from SecurityContextHolder.getContext() and passes it in
 
         var currentUser = CurrentUser.set(auth);
 

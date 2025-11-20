@@ -15,6 +15,8 @@ COPY modules ./modules
 
 # Move into the user-service module then build it
 WORKDIR /app/modules/user-service
+
+# Compiles tests, but doesn't run them when starting up
 RUN mvn clean package -DskipTests
 
 # Result: Maven compiles user-service and produces a JAR at: /app/modules/user-service/target/<something>.jar

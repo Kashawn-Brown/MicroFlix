@@ -18,11 +18,11 @@ public class RatingService {
         this.ratingRepository = ratingRepository;
     }
 
-    public RatingResponse createRating(CreateRating request) {
+    public RatingResponse createRating(UUID userId, CreateRating request) {
 
         // 1) Check if a rating already exists for this user + movie
         var existing = ratingRepository.findByUserIdAndMovieId(
-                request.userId(),
+                userId,
                 request.movieId()
         );
 
@@ -32,7 +32,7 @@ public class RatingService {
         // compute rating out of 100 to store as an integer
         int rate  = toRatingTimesTen(request.rate());
 
-        rating.setUserId(request.userId());
+        rating.setUserId(userId);
         rating.setMovieId(request.movieId());
         rating.setRatingTimesTen(rate);
 
@@ -41,9 +41,7 @@ public class RatingService {
         return toResponse(newRating);
     }
 
-    public RatingResponse updateRating(UpdateRating request) {
-        // TODO: once auth is wired, we'll set userId from the authenticated user
-        UUID userId = request.userId();
+    public RatingResponse updateRating(UUID userId, UpdateRating request) {
         Long movieId = request.movieId();
 
         var rating = ratingRepository.findByUserIdAndMovieId(userId, movieId)
