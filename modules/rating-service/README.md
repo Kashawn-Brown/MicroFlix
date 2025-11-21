@@ -313,6 +313,32 @@ GET http://localhost:8081/api/v1/ratings/movie/1
 
 I expect a non-empty JSON array including my updated rating.
 
+4. **Get rating summary for a movie**
+
+```http
+GET http://localhost:8081/api/v1/ratings/movie/1/summary
+```
+
+I expect a `200 OK` with a JSON body like:
+
+```json
+{
+  "movieId": 1,
+  "average": 8.1,
+  "count": 5
+}
+```
+
+If there are no ratings yet for that movie, I still expect `200 OK`, but with:
+
+```json
+{
+  "movieId": 1,
+  "average": null,
+  "count": 0
+}
+```
+
 ---
 
 ## Running tests
