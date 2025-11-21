@@ -332,6 +332,36 @@ If everything is green, I know the core behavior of rating-service is stable.
 
 ---
 
+## Authentication & error shape
+
+For rating writes, I rely on the JWT issued by the user-service.
+
+- `POST /api/v1/ratings` and `PATCH /api/v1/ratings` require a valid JWT.
+- All `GET /api/v1/ratings/**` endpoints are **public** (anyone can view ratings).
+
+I send the token as:
+
+```http
+Authorization: Bearer <JWT>
+````
+
+If I try to create/update a rating without a valid token (missing, invalid, or expired), the `JwtAuthenticationEntryPoint` returns a `401 Unauthorized` in `ProblemDetail` format:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "Authentication is required to create or update ratings.",
+  "path": "/api/v1/ratings",
+  "timestamp": "2025-11-20T12:34:56.789Z"
+}
+```
+
+Other rating errors (like “rating not found” or invalid score) are handled by `RatingErrorAdvice` and also returned as `ProblemDetail`.
+
+---
+
 ## Future work
 
 Later improvements I plan to make:
@@ -341,3 +371,4 @@ Later improvements I plan to make:
 * Potentially share a common `CurrentUser` pattern across services, similar to user-service.
 
 ---
+

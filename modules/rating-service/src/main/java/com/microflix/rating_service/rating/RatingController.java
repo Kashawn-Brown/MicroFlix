@@ -1,6 +1,7 @@
 package com.microflix.rating_service.rating;
 
 import com.microflix.rating_service.rating.dto.CreateRating;
+import com.microflix.rating_service.rating.dto.MovieRatingSummaryResponse;
 import com.microflix.rating_service.rating.dto.RatingResponse;
 import com.microflix.rating_service.rating.dto.UpdateRating;
 import com.microflix.rating_service.security.CurrentUser;
@@ -66,6 +67,18 @@ public class RatingController {
     public ResponseEntity<RatingResponse> getRating(@PathVariable Long ratingId) {
 
         var response = service.getRating(ratingId);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Returns the average rating and count for a given movie.
+     * Public: no authentication required.
+     */
+    @GetMapping("/movie/{movieId}/summary")
+    public ResponseEntity<MovieRatingSummaryResponse> getMovieRatingSummary(@PathVariable Long movieId) {
+
+        var response = service.getMovieRatingSummary(movieId);
 
         return ResponseEntity.ok(response);
     }

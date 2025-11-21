@@ -237,4 +237,45 @@ class RatingServiceTest {
         assertThrows(RatingNotFoundException.class,
                 () -> ratingService.getRating(99L));
     }
+
+    @Test
+    void getMovieRatingSummary_whenRatingsExist_returnsAverageAndCount() {
+        Long movieId = 10L;
+
+        // Fake projection implementation for the test
+        RatingRepository.RatingSummaryProjection projection =
+                new RatingRepository.RatingSummaryProjection() {
+                    @Override
+                    public Long getMovieId() { return movieId; }
+                    @Override
+                    public Double getAverageTimesTen() { return 85.0; }  // 8.5/10
+                    @Override
+                    public Long getCount() { return 4L; }
+                };
+
+        when(ratings.findSummaryByMovieId(movieId))
+                .thenReturn(Optional.of(projection));
+
+        var summary = ratingService.getMovieRatingSummary(movieId);
+
+        assertNotNull(summary);
+        assertEquals(movieId, summary.movieId());
+        assertEquals(8.5, summary.average(), 0.0001);
+        assertEquals(4L, summary.count());
+    }
+
+    @Test
+    void getMovieRatingSummary_whenNoRatings_returnsZeroCountAndNullAverage() {
+        Long movieId = 10L;
+
+        when(ratings.findSummaryByMovieId(movieId))
+                .thenReturn(Optional.empty());
+
+        var summary = ratingService.getMovieRatingSummary(movieId);
+
+        assertNotNull(summary);
+        assertEquals(movieId, summary.movieId());
+        assertNull(summary.average());
+        assertEquals(0L, summary.count());
+    }
 }

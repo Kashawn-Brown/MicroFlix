@@ -2,6 +2,7 @@ package com.microflix.rating_service.rating;
 
 import com.microflix.rating_service.common.errors.RatingNotFoundException;
 import com.microflix.rating_service.rating.dto.CreateRating;
+import com.microflix.rating_service.rating.dto.MovieRatingSummaryResponse;
 import com.microflix.rating_service.rating.dto.RatingResponse;
 import com.microflix.rating_service.rating.dto.UpdateRating;
 import org.springframework.stereotype.Service;
@@ -90,6 +91,36 @@ public class RatingService {
 
         return toResponse(rating);
     }
+
+
+    /**
+     * Returns summary stats for all ratings on a given movie.
+     * If there are no ratings, returns count=0 and average=null.
+     */
+    public MovieRatingSummaryResponse getMovieRatingSummary(Long movieId) {
+        var summaryOpt = ratingRepository.findSummaryByMovieId(movieId);
+
+        if (summaryOpt.isPresent()) {
+            var summary = summaryOpt.get();
+
+            double average = summary.getAverageTimesTen() / 10.0;
+
+            return new MovieRatingSummaryResponse(
+                    summary.getMovieId(),
+                    average,
+                    summary.getCount()
+            );
+        }
+        else {
+            // No ratings found for this movie
+            return new MovieRatingSummaryResponse(
+                    movieId,
+                    null,
+                    0L
+            );
+        }
+    }
+
 
 
     ///  Helper Functions

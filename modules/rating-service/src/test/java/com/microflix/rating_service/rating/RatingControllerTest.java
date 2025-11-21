@@ -1,6 +1,7 @@
 package com.microflix.rating_service.rating;
 
 import com.microflix.rating_service.rating.dto.CreateRating;
+import com.microflix.rating_service.rating.dto.MovieRatingSummaryResponse;
 import com.microflix.rating_service.rating.dto.RatingResponse;
 import com.microflix.rating_service.rating.dto.UpdateRating;
 import com.microflix.rating_service.security.CurrentUser;
@@ -176,4 +177,23 @@ class RatingControllerTest {
         assertEquals(ratingId, response.getBody().id());
         assertEquals(9.0, response.getBody().rate(), 0.0001);
     }
+
+    @Test
+    void getMovieRatingSummary_returnsOkWithBody() {
+        Long movieId = 10L;
+        var dto = new MovieRatingSummaryResponse(movieId, 7.8, 3L);
+
+        when(ratingService.getMovieRatingSummary(movieId))
+                .thenReturn(dto);
+
+        ResponseEntity<MovieRatingSummaryResponse> response =
+                controller.getMovieRatingSummary(movieId);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(movieId, response.getBody().movieId());
+        assertEquals(7.8, response.getBody().average(), 0.0001);
+        assertEquals(3L, response.getBody().count());
+    }
+
 }

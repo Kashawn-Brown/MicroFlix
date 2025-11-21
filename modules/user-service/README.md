@@ -262,6 +262,39 @@ As I refine the API, the goal is to keep controller code simple and move more of
 
 ---
 
+## Authentication & error shape
+
+The user-service issues JWTs from `/api/v1/auth/login` and `/api/v1/auth/register`.  
+On successful login, I get back a token that I pass to other services as:
+
+```http
+Authorization: Bearer <JWT>
+````
+
+Security rules:
+
+* `POST /api/v1/auth/**` and `/api/v1/users/health` are **public**.
+* All other `/api/**` endpoints require a valid JWT.
+
+If I hit a protected endpoint without a token, or with an invalid/expired token, Spring Security calls my `JwtAuthenticationEntryPoint` and I get a `401 Unauthorized` response using Spring’s `ProblemDetail` format, for example:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "Authentication is required to access this resource.",
+  "path": "/api/v1/users/me",
+  "timestamp": "2025-11-20T12:34:56.789Z"
+}
+```
+
+Domain / validation errors inside the service also use `ProblemDetail`, so clients always see a consistent error shape.
+
+
+
+---
+
 ## Future plans
 
 Later, I plan to extend user-service to:
