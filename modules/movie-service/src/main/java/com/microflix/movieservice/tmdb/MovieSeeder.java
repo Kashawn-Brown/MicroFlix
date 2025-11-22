@@ -19,9 +19,10 @@ import java.time.ZoneOffset;
  * Runs once on startup when movie.tmdb.seed.enabled=true.
  */
 @Component
-@ConditionalOnProperty(name = "movie.tmdb.seed.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "movie.tmdb.seed.enabled", havingValue = "true")  // When the app starts, Spring will only create this bean (and run it) if the property is enabled.
 public class MovieSeeder implements CommandLineRunner {
 
+    // Logging seeding progress and skips for easier debugging.
     private static final Logger log = LoggerFactory.getLogger(MovieSeeder.class);
 
     private final MovieRepository movieRepository;
@@ -33,6 +34,10 @@ public class MovieSeeder implements CommandLineRunner {
     }
 
 
+    /**
+     * Entry point for CommandLineRunner.
+     * Called once after the Spring context is fully initialized.
+     */
     @Override
     public void run(String... args) {
 
@@ -53,6 +58,7 @@ public class MovieSeeder implements CommandLineRunner {
 
     /**
      * Takes the list of movies of API response and seeds into db
+     * Idempotent: skips movies that already exist (based on tmdbid)
      */
     private int seedMovies(TmdbMovieListResponse movieList, String listName) {
         if (movieList == null || movieList.results() == null || movieList.results().isEmpty()) {

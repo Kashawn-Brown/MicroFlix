@@ -7,9 +7,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+/**
+ * Thin wrapper around the TMDb API.
+ * Responsible for making HTTP calls and mapping responses to DTOs.
+ */
 @Component
 public class TmdbClient {
 
+    // Logging for easier debugging.
     private static final Logger log = LoggerFactory.getLogger(TmdbClient.class);
 
     private final RestClient restClient;
@@ -17,10 +22,10 @@ public class TmdbClient {
 
     public TmdbClient(@Value("${tmdb.base-url}") String baseUrl, @Value("${tmdb.api-key}") String apiKey) {
 
-        // Set up Tmdb API key
+        // TMDb API key injected from configuration
         this.apiKey = apiKey;
 
-        // Build a RestClient configured with base URL
+        // Pre-configured RestClient with the TMDb base URL (avoid repeating it on every call)
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .build();
@@ -46,6 +51,9 @@ public class TmdbClient {
                 .body(TmdbMovieListResponse.class);
     }
 
+    /**
+     * Fetches the first page of top-rated movies from TMDb.
+     */
     public TmdbMovieListResponse fetchTopRatedMovies() {
         log.info("Fetching top rated movies from TMDb");
 
@@ -61,6 +69,9 @@ public class TmdbClient {
                 .body(TmdbMovieListResponse.class);
     }
 
+    /**
+     * Fetches the first page of upcoming movies from TMDb.
+     */
     public TmdbMovieListResponse fetchUpcomingMovies() {
         log.info("Fetching upcoming movies from TMDb");
 
@@ -76,6 +87,9 @@ public class TmdbClient {
                 .body(TmdbMovieListResponse.class);
     }
 
+    /**
+     * Fetches the first page of now-playing movies from TMDb.
+     */
     public TmdbMovieListResponse fetchNowPlayingMovies() {
         log.info("Fetching now playing movies from TMDb");
 

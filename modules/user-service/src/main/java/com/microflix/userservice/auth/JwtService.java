@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 /**
- * Creates HS256 JWT tokens. Secret in application.yml.
+ * Issues and verifies HS256 JWT tokens.
  */
 public class JwtService {
 
@@ -24,10 +24,13 @@ public class JwtService {
         this.issuer = issuer;
         this.minutesToExpire = minutesToExpire;
 
-        // Build a verifier that enforces the same issuer and HMAC secret.
-        this.verifier = JWT.require(algorithm).withIssuer(issuer).build();
+        // Build a verifier that checks signature and issuer.
+        this.verifier = JWT.require(algorithm)
+                .withIssuer(issuer)
+                .build();
     }
 
+    // Creates a signed JWT for the given user.
     public String createToken(User user) {
         Instant now = Instant.now();
         Instant expiry = now.plus(minutesToExpire, ChronoUnit.MINUTES);
@@ -42,7 +45,7 @@ public class JwtService {
                 .sign(algorithm);
     }
 
-
+    // Verifies the token and returns the decoded JWT.
     public DecodedJWT verifyToken(String token) {
         return verifier.verify(token);
     }

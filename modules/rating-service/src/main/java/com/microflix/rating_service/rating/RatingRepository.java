@@ -8,7 +8,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Repository
+
+@Repository         // JPA repository for Rating entities.
 public interface RatingRepository extends JpaRepository<Rating, Long> {
 
     Optional<Rating> findByUserIdAndMovieId(UUID userId, Long movieId);
@@ -17,7 +18,24 @@ public interface RatingRepository extends JpaRepository<Rating, Long> {
 
     List<Rating> findByMovieId(Long movieId);
 
-    // Projection interface for summary query
+
+    // ---------- Summary projection + custom query ----------
+
+    /**
+     * This tiny interface describes the "shape" of one summary row
+     * returned by our custom query below.
+     *
+     * Spring Data JPA will:
+     *  - run the query
+     *  - take each row
+     *  - create an object that implements this interface
+     *  - wire each column into the matching getter
+     *
+     * The method names MUST match the column aliases in the query:
+     *  - getMovieId()         ← "movieId" alias
+     *  - getAverageTimesTen() ← "averageTimesTen" alias
+     *  - getCount()           ← "count" alias
+     */
     interface RatingSummaryProjection {
         Long getMovieId();
         Double getAverageTimesTen();
@@ -25,14 +43,18 @@ public interface RatingRepository extends JpaRepository<Rating, Long> {
     }
 
     /**
-     * Returns a single row with avg(rating_times_ten) and count for a movie, if any ratings exist.
+     * Returns one "summary row" for a given movie:
+     *  - average rating (still in times-ten form)
+     *  - how many ratings there are
+     *
+     * If there are no ratings for this movie, the Optional will be empty.
      */
     @Query("""
-           select r.movieId as movieId,
-                  avg(r.ratingTimesTen) as averageTimesTen,
-                  count(r.id) as count
+           select r.movieId as movieId,                         -- will map to getMovieId()
+                  avg(r.ratingTimesTen) as averageTimesTen,     -- maps to getAverageTimesTen()
+                  count(r.id) as count                          -- maps to getCount()
            from Rating r
-           where r.movieId = :movieId
+           where r.movieId = :movieId                           -- :movieId comes from the method parameter
            group by r.movieId
            """)
     Optional<RatingSummaryProjection> findSummaryByMovieId(Long movieId);

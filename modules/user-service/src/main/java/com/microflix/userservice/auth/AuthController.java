@@ -12,9 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Auth endpoints -> register and login.
- *
- * Routes here are public (SecurityConfig):
+ * Auth endpoints for registering and logging in users.
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -27,8 +25,7 @@ public class AuthController {
     }
 
     /**
-     * User Register
-     *
+     * Registers a new user and returns a JWT.
      */
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Validated @RequestBody RegisterRequest request) {
@@ -39,8 +36,7 @@ public class AuthController {
 
 
     /**
-     * User Login
-     *
+     * Logs in an existing user and returns a JWT.
      */
     @PostMapping("login")
     ResponseEntity<AuthResponse> login(@Validated @RequestBody LoginRequest request) {

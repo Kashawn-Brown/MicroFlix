@@ -9,15 +9,14 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Global error -> turn thrown exceptions into small, clean JSON.
- * - 400 for bad input (our IllegalArgumentException + @Valid errors)
- * - 500 for everything else (hide internals from clients)
+ * Global error handler converting exceptions to ProblemDetail JSON.
+ * - 400 for bad input and validation errors
+ * - 500 for uncaught errors
  */
-
 @RestControllerAdvice
 public class ErrorAdvice {
 
-    // Bad input from user (If any controller (or service called by it) throws IllegalArgumentException, this method is used)
+    // 400 for IllegalArgumentException (bad input).
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail badRequest(IllegalArgumentException ex) {
 
@@ -29,7 +28,7 @@ public class ErrorAdvice {
         return pd;
     }
 
-    // Validation failures (@Valid on DTOs)
+    // 400 for Validation failures (@Valid on DTOs)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail validation(MethodArgumentNotValidException ex) {
 
@@ -49,6 +48,7 @@ public class ErrorAdvice {
     }
 
     // Safety net: catches any exception that wasn’t caught by more specific handlers above
+    // 500 for any other unhandled exception.
     @ExceptionHandler(Exception.class)
     ProblemDetail fallback(Exception ex) {
 

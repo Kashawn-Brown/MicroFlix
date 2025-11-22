@@ -15,7 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 /**
  * Security setup for user-service:
- * - /api/v1/auth/** and health/actuator endpoints are open.
+ * - /api/v1/auth/** and health/actuator endpoints are public.
  * - All other /api/** routes require a valid JWT.
  * - Uses stateless JWT-based authentication.
  */
@@ -41,9 +41,10 @@ public class SecurityConfig {
                 .anyRequest().permitAll()                                                        // leaving everything else open for now
         );
 
-        // When an anonymous request hits a protected route, use our ProblemDetail 401 handler
+        // Use custom handler when authentication is required but missing/invalid.
         http.exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint));
-        // run JWT filter before Spring's username/password auth filter in security filter chain (just need to happen early -> before Spring decides authorization)
+
+        // Run JWT filter before Spring's username/password auth filter in security filter chain
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -56,7 +57,7 @@ public class SecurityConfig {
     }
 
     // Retrieving info from yml file
-    // JwtService bean: central place that issues and validates JWTs for user-service
+    // JwtService bean for issuing and verifying JWTs.
     @Bean
     public JwtService jwtService(
             @Value("${app.jwt.secret}") String secret,

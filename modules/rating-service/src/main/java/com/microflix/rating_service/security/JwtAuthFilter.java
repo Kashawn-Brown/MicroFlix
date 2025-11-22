@@ -36,16 +36,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        try {// Retrieving Authorization header
+        try {
+            // Retrieving Authorization header
             String header = request.getHeader("Authorization");
 
-            // If token present
+            // If token is present & starts with "Bearer " -> try to authenticate.
             if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
 
                 // Strip "Bearer " prefix
                 String token = header.substring(7);
 
-                // Convert the JWT into CurrentUser model
+                // Validate the JWT and build a CurrentUser
                 CurrentUser currentUser = jwtVerifier.verify(token);
 
                 // Map roles ("USER") to Spring authorities ("ROLE_USER")
@@ -57,11 +58,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(currentUser, null, authorities);
 
+                // Store authentication in the SecurityContext for this request.
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (Exception ex) {
-            // For now log and continue as anonymous.
-            // SecurityConfig will decide if anonymous is allowed for the endpoint.
+            // On any JWT error, log it and clear the context (treat as anonymous).
+            // SecurityConfig decides whether anonymous is allowed for this endpoint.
             log.warn("Failed to authenticate JWT: {}", ex.getMessage());
             SecurityContextHolder.clearContext();
         }

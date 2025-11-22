@@ -21,11 +21,8 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * JWT Filter
- * Runs once per request before controllers.
- * Goal: if the request has a valid "Authorization: Bearer <JWT>" header,
- *       put an authenticated user (email + roles) into Spring Security's context.
- * If no/invalid token -> do nothing here; downstream rules may reject later.
+ * Extracts a JWT from the Authorization header and, if valid,
+ * sets an authenticated user in the SecurityContext.
  */
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -49,12 +46,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             // Retrieving Authorization header
             String header = request.getHeader("Authorization");
 
-            // If token present
+            // If token is present & starts with "Bearer " -> try to authenticate.
             if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
+
+                // Strip "Bearer " prefix
                 String token = header.substring(7);
 
+                // Validate the JWT
                 DecodedJWT decoded = jwt.verifyToken(token);
 
+                // Retrieve user info from token
                 String email = decoded.getSubject();
                 String rolesCsv = decoded.getClaim("roles").asString();
 
@@ -68,16 +69,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 // Setting authenticated user info for the current request thread
                 var auth = new UsernamePasswordAuthenticationToken(email, null, authorities);
+
+                // Store authentication in the SecurityContext for this request.
                 SecurityContextHolder.getContext().setAuthentication(auth);
             }
         } catch(Exception e) {
+            // On any JWT error, log it and clear the context (treat as anonymous).
+            // SecurityConfig decides whether anonymous is allowed for this endpoint.
             log.warn("Failed to authenticate JWT: {}", e.getMessage());
             SecurityContextHolder.clearContext();
         }
 
         // Continue the filter chain - Passes request to the next filter/controller
         chain.doFilter(request, response);
-
 
     }
 }

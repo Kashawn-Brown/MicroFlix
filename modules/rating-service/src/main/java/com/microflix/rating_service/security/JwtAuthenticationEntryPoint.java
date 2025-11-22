@@ -14,9 +14,9 @@ import java.io.IOException;
 import java.time.OffsetDateTime;
 
 /**
- * Handles cases where a request hits a protected endpoint
- * without a valid authentication (no token, invalid token, expired, etc.).
- * Spring Security calls this when it decides "you must be authenticated here".
+ * Called by Spring Security when a protected endpoint is hit
+ * without valid authentication (missing/invalid/expired token).
+ * Produces a 401 response with a ProblemDetail JSON body.
  */
 @Component
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -46,6 +46,7 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
 
+        // Write the ProblemDetail as JSON to the response body.
         objectMapper.writeValue(response.getOutputStream(), problem);
     }
 

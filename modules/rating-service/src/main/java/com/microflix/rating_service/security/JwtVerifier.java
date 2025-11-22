@@ -12,7 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-// Small helper responsible only for verifying tokens and building a CurrentUser.
+// Responsible for verifying JWT tokens and converting them into a CurrentUser.
 @Component
 public class JwtVerifier {
 
@@ -23,34 +23,42 @@ public class JwtVerifier {
             @Value("${app.jwt.issuer}") String issuer
     ) {
 
-        // HMAC with a shared secret (matches user-service)
+        // Use HMAC with a shared secret; matches the issuer service.
         Algorithm algorithm = Algorithm.HMAC256(secret);
 
-
+        // Pre-build a verifier that checks signature + issuer.
         this.verifier = JWT.require(algorithm)
                 .withIssuer(issuer)
                 .build();
     }
 
+
+    /**
+     * Verifies the given JWT + returns authenticated user data
+     *
+     * Checks its signature and issuer
+     * Extracts the authenticated user's data from its claims.
+     */
     public CurrentUser verify(String token) {
 
         // Verify signature + issuer and parse claims
         DecodedJWT jwt = verifier.verify(token);
 
-        // retrieve user id from token
+        // Extract user ID from "userId" claim.
         String userIdString = jwt.getClaim("userId").asString();
         UUID userId = UUID.fromString(userIdString);
 
-        String email = jwt.getSubject(); // 'sub' claim, we use email here
+        // Email is stored in the subject ("sub").
+        String email = jwt.getSubject();
 
-        // roles come as string "USER, ADMIN" convert
+        // Roles come as a comma-separated string, e.g. "USER,ADMIN".
         String rolesString = jwt.getClaim("roles").asString();
-        List<String> roles = Arrays.stream(rolesString.split(","))                    // drop blanks/empty items
-                                    .filter(StringUtils::hasText)                           // remove leading/trailing spaces
-                                    .map(String::trim)
+        List<String> roles = Arrays.stream(rolesString.split(","))
+                                    .filter(StringUtils::hasText)   // drop blanks/empty items
+                                    .map(String::trim)  // remove leading/trailing spaces
                                     .toList();
 
-
+        // Build our domain model for the authenticated user.
         return new CurrentUser(userId, email, roles);
     }
 

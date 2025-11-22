@@ -13,7 +13,7 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Service
-public class AuthService {
+public class AuthService {      // Handles registration and login logic.
 
     private final UserRepository users;
 
@@ -62,9 +62,9 @@ public class AuthService {
     /**
      * Login existing user
      *
-     * - Validates credentials
+     * - Validates email/password
      * - Updates lastLoginAt
-     * - Generates JWT
+     * - Generates and returns a new JWT
      */
     public AuthResponse login(LoginRequest request) {
         var normalizedEmail = request.email().toLowerCase();

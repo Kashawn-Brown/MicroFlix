@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-public class RatingService {
+public class RatingService {        // Encapsulates business logic for rating operations.
 
     private final RatingRepository ratingRepository;
 
@@ -19,9 +19,13 @@ public class RatingService {
         this.ratingRepository = ratingRepository;
     }
 
+
+    /**
+     * Creates a new rating or updates an existing one for the user + movie
+     */
     public RatingResponse createRating(UUID userId, CreateRating request) {
 
-        // 1) Check if a rating already exists for this user + movie
+        // Check if a rating already exists for this user + movie
         var existing = ratingRepository.findByUserIdAndMovieId(
                 userId,
                 request.movieId()
@@ -42,16 +46,17 @@ public class RatingService {
         return toResponse(newRating);
     }
 
+    /**
+     * Updates an existing rating for the given user and movie.
+     */
     public RatingResponse updateRating(UUID userId, UpdateRating request) {
         Long movieId = request.movieId();
 
         var rating = ratingRepository.findByUserIdAndMovieId(userId, movieId)
                 .orElseThrow(() -> new RatingNotFoundException("Rating cannot be found"));
 
-        // compute rating out of 100 to store as an integer
         int rate  = toRatingTimesTen(request.rate());
 
-        // Update rating
         rating.setRatingTimesTen(rate);
 
         var updatedRating = ratingRepository.save(rating);
@@ -59,6 +64,9 @@ public class RatingService {
         return toResponse(updatedRating);
     }
 
+    /**
+     * Returns all ratings for a movie.
+     */
     public List<RatingResponse> getAllMovieRatings(Long id) {
 
         return ratingRepository.findByMovieId(id)
@@ -67,7 +75,9 @@ public class RatingService {
                 .toList();
     }
 
-
+    /**
+     * Returns all ratings created by a user.
+     */
     public List<RatingResponse> getAllUserRatings(UUID userId) {
 
         return ratingRepository.findByUserId(userId)
@@ -76,7 +86,9 @@ public class RatingService {
                 .toList();
     }
 
-
+    /**
+     * Returns a user's rating for a specific movie.
+     */
     public RatingResponse getUserRatingForMovie(Long movieId, UUID userId) {
         var rating = ratingRepository.findByUserIdAndMovieId(userId, movieId)
                 .orElseThrow(() -> new RatingNotFoundException("Rating for user " + userId + " and movie " + movieId + " was not found"));
@@ -84,7 +96,9 @@ public class RatingService {
         return toResponse(rating);
     }
 
-
+    /**
+     * Returns a rating by its ID.
+     */
     public RatingResponse getRating(Long ratingId) {
         var rating = ratingRepository.findById(ratingId)
                 .orElseThrow(() -> new RatingNotFoundException("Rating " + ratingId + " was not found"));
@@ -121,11 +135,22 @@ public class RatingService {
         }
     }
 
+    public void deleteRating(UUID userId, Long movieId) {
+
+        var rating = ratingRepository.findByUserIdAndMovieId(userId, movieId)
+                .orElseThrow(() -> new RatingNotFoundException("Rating for user " + userId + " and movie " + movieId + " was not found"));
+
+        ratingRepository.delete(rating);
+
+    }
 
 
     ///  Helper Functions
 
 
+    /**
+     * Maps Rating entity to response DTO.
+     */
     private RatingResponse toResponse(Rating rating) {
 
         double rate = ratingToDouble(rating.getRatingTimesTen());

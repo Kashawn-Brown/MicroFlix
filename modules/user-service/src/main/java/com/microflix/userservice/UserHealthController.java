@@ -4,7 +4,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class UserHealthController {
+public class UserHealthController {         // Simple health check endpoint for the user service.
 
     @GetMapping("api/v1/users/health")
     public String health() {

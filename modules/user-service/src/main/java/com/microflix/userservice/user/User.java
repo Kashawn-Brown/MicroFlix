@@ -7,9 +7,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
-/**
- * JPA entity -> maps to table "users".
- */
+
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
@@ -31,8 +29,9 @@ public class User {
     @Column(name = "display_name", length = 100)
     private String displayName;
 
+    // Comma-separated roles (e.g. "USER", "ADMIN").
     @Column(nullable = false, length = 100)
-    private String roles = "USER"; // simple: comma list (e.g., "USER", "ADMIN")
+    private String roles = "USER";
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
@@ -46,18 +45,23 @@ public class User {
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
 
-
+    // Normalize email + initialize timestamps on insert.
     @PrePersist
     void onCreate() {
         if (email != null) email = email.toLowerCase();  // normalize
+
+        displayName = email;
 
         var now = OffsetDateTime.now(ZoneOffset.UTC);    // app-clock in UTC
         createdAt = now;
         updatedAt = now;
     }
 
+    // Update timestamp on any update.
     @PreUpdate
     void onUpdate() {
+        if (displayName == null) displayName = email;
+
         updatedAt = OffsetDateTime.now(ZoneOffset.UTC);  // bump on any update
     }
 

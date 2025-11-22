@@ -7,21 +7,12 @@ import com.microflix.userservice.user.dto.UpdateProfileRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.Map;
 
 /**
- * Profile endpoints -> For current user endpoints
- *
- * Protected sample endpoint:
- * - requires a valid JWT (per security rules)
- * - returns the current user's email + roles
+ * Profile endpoints for the currently authenticated user.
  */
 @RestController
 @RequestMapping("/api/v1/users")
@@ -33,11 +24,17 @@ public class ProfileController {
         this.profileService = profileService;
     }
 
-    /**     ROUTES      **/
 
-    // Spring injects Authentication from SecurityContext (set by our JwtAuthFilter)
+
+
+
+    /**
+     * Returns profile info for the current user.
+     */
     @GetMapping("/me")
-    public ResponseEntity<ProfileMeResponse> me(Authentication auth) { // Authentication is a recognized parameter type -> reads the Authentication from SecurityContextHolder.getContext() and passes it in
+    public ResponseEntity<ProfileMeResponse> me(Authentication auth) {
+        // Spring injects Authentication from SecurityContext (set by our JwtAuthFilter)
+        // Authentication is a recognized parameter type -> reads the Authentication from SecurityContextHolder.getContext() and passes it in
 
         var currentUser = CurrentUser.set(auth);
 
@@ -49,12 +46,15 @@ public class ProfileController {
 
 
     /**
-     * Update User
+     * Updates the current user's profile
      *
      * Basic for now -> only update displayName
-     * **/
+     */
     @PatchMapping("/me")
-    public ResponseEntity<ProfileMeResponse> updateProfile(@Validated @RequestBody UpdateProfileRequest request, Authentication auth) {
+    public ResponseEntity<ProfileMeResponse> updateProfile(
+            @Validated @RequestBody UpdateProfileRequest request,
+            Authentication auth
+    ) {
 
         var currentUser = CurrentUser.set(auth);
 
@@ -67,11 +67,13 @@ public class ProfileController {
     /**
      * Change the current user's password.
      *
-     * - validates old password
-     * - sets new password
+     * Returns 204 on success.
      */
     @PatchMapping("/me/password")
-    public ResponseEntity<?> changePassword(@Validated @RequestBody ChangePasswordRequest request, Authentication auth) {
+    public ResponseEntity<?> changePassword(
+            @Validated @RequestBody ChangePasswordRequest request,
+            Authentication auth
+    ) {
 
         var currentUser = CurrentUser.set(auth);
 

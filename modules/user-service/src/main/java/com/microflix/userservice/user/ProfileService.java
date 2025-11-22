@@ -14,7 +14,7 @@ import java.time.ZoneOffset;
 import java.util.Map;
 
 @Service
-public class ProfileService {
+public class ProfileService {       // Business logic for profile-related operations on the current user.
 
     private final UserRepository users;
     private final PasswordEncoder encoder;
@@ -25,9 +25,7 @@ public class ProfileService {
     }
 
     /**
-     * "me" response for the current user.
-     *
-     * Uses DTO instead of raw Map for a stable, typed contract.
+     * Builds the "me" response for the current user.
      */
     public ProfileMeResponse me(CurrentUser currentUser) {
         // find current user by email
@@ -35,7 +33,10 @@ public class ProfileService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         return new ProfileMeResponse(
-                user.getId(), user.getEmail(), user.getDisplayName(),  currentUser.roles()
+                user.getId(),
+                user.getEmail(),
+                user.getDisplayName(),
+                currentUser.roles()
         );
     }
 
@@ -46,11 +47,9 @@ public class ProfileService {
      */
     public ProfileMeResponse updateProfile(CurrentUser currentUser, UpdateProfileRequest request) {
 
-        // find current user by email
         var user = users.findByEmail(currentUser.email())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // update displayName
         if (request.displayName() != null) {
             user.setDisplayName(request.displayName());
         }
@@ -67,8 +66,7 @@ public class ProfileService {
     /**
      * Change the current user's password.
      *
-     * Throws IllegalArgumentException if the old password is wrong,
-     * which our ErrorAdvice will convert to a 400.
+     * Throws IllegalArgumentException if the old password is wrong.
      */
     public ResponseEntity<?> changePassword(CurrentUser currentUser, ChangePasswordRequest request) {
 

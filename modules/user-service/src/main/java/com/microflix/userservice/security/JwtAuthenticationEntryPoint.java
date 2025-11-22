@@ -13,9 +13,10 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 
+
 /**
- * Entry point for unauthenticated requests that hit protected endpoints.
- * Returns a ProblemDetail JSON body so the error shape is consistent with other errors.
+ * Handles unauthenticated access to protected endpoints.
+ * Returns a ProblemDetail JSON for 401 responses.
  */
 @Component
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -45,7 +46,7 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
 
-        // Serialize the ProblemDetail as JSON
+        // Write the ProblemDetail as JSON to the response body.
         objectMapper.writeValue(response.getOutputStream(), problem);
     }
 }

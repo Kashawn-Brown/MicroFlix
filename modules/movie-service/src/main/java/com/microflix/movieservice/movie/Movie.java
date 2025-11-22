@@ -9,7 +9,7 @@ import java.time.ZoneOffset;
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)           // control equality - Entity equality based on id now
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)           // control equality
 @ToString(onlyExplicitlyIncluded = true)
 @Entity
 @Table(name = "movies")
@@ -38,6 +38,7 @@ public class Movie {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
 
+    // Initialize timestamps on insert.
     @PrePersist
     void onCreate() {
         var now = OffsetDateTime.now(ZoneOffset.UTC);    // app-clock in UTC
@@ -45,6 +46,7 @@ public class Movie {
         updatedAt = now;
     }
 
+    // Update timestamp on any update.
     @PreUpdate
     void onUpdate() {
         updatedAt = OffsetDateTime.now(ZoneOffset.UTC);  // bump on any update

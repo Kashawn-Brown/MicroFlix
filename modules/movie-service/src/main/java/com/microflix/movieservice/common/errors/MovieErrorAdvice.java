@@ -10,17 +10,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 
 /**
- * Central place for movie-related exceptions -> HTTP response mapping.
+ * Maps movie-related exceptions to HTTP error responses.
  */
 @RestControllerAdvice
 public class MovieErrorAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(MovieErrorAdvice.class);
 
+    // Handles "movie not found" errors as HTTP 404 with a ProblemDetail body.
     @ExceptionHandler(MovieNotFoundException.class)
     ProblemDetail handleMovieNotFound(MovieNotFoundException ex) {
 
-        // Log at debug/info level – this is a normal 404, not a server bug
         log.info("Movie not found: {}", ex.getMessage());
 
         var problem = ProblemDetail.forStatusAndDetail(
@@ -29,6 +29,6 @@ public class MovieErrorAdvice {
         );
         problem.setTitle("Movie not found");
 
-        return problem;  // Spring will render this as a 404 response with JSON body
+        return problem;
     }
 }

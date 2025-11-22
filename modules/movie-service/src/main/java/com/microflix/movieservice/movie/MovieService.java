@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
-public class MovieService {
+public class MovieService {         // Encapsulates business logic for movie operations.
 
     private final MovieRepository movieRepository;
 
@@ -16,6 +16,9 @@ public class MovieService {
         this.movieRepository = movieRepository;
     }
 
+    /**
+     * Returns all movies; mapped to response DTOs.
+     */
     public List<MovieResponse> getAllMovies() {
         return movieRepository.findAll()
                 .stream()
@@ -23,6 +26,9 @@ public class MovieService {
                 .toList();
     }
 
+    /**
+     * Returns a single movie by id or throws if not found.
+     */
     public MovieResponse getMovie(Long id) {
         Movie movie = movieRepository.findById(id)
                 .orElseThrow(() -> new MovieNotFoundException(id));
@@ -30,6 +36,9 @@ public class MovieService {
         return toResponse(movie);
     }
 
+    /**
+     * Creates a new movie from the request DTO and returns the saved movie.
+     */
     public MovieResponse createMovie(CreateMovieRequest request) {
         Movie movie = new Movie();
 
@@ -49,6 +58,9 @@ public class MovieService {
 
     ///  Helper Function
 
+    /**
+     * Maps a Movie entity to a MovieResponse DTO.
+     */
     private MovieResponse toResponse(Movie movie) {
         return new MovieResponse(
                 movie.getId(),

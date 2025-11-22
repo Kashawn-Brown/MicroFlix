@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/movies")
+@RequestMapping("/api/v1/movies")       // Handles HTTP requests related to movie resources.
 public class MovieController {
 
     private final MovieService movieService;
@@ -18,6 +18,9 @@ public class MovieController {
         this.movieService = movieService;
     }
 
+    /**
+     * Returns all movies.
+     */
     @GetMapping
     public ResponseEntity<List<MovieResponse>> getAllMovies() {
 
@@ -26,6 +29,9 @@ public class MovieController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Returns a single movie by its id.
+     */
     @GetMapping("/{id}")
     public ResponseEntity<MovieResponse> getMovie(@PathVariable Long id) {
 
@@ -34,6 +40,9 @@ public class MovieController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Creates a new movie and returns it with HTTP 201.
+     */
     @PostMapping
     public ResponseEntity<MovieResponse> createMovie(@RequestBody CreateMovieRequest request) {
 

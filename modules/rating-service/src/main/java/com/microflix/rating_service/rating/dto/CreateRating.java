@@ -1,7 +1,6 @@
 package com.microflix.rating_service.rating.dto;
 
-import java.util.UUID;
-
+// Request body for creating a rating for a movie.
 public record CreateRating(
         Long movieId,
         double rate
