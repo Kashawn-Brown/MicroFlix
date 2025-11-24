@@ -10,5 +10,7 @@ public record CreateMovieRequest(
         Integer releaseYear,
         Integer runtime,
         Long tmdbId,
+        String posterUrl,
+        String backdropUrl,
         List<String> genres
         ) {}

@@ -94,14 +94,12 @@ public class MovieSeeder implements CommandLineRunner {
                 continue;
             }
 
-//            log.info("Movie: {}", tmdbMovie.title());
-
-            log.info("Movie: {} Genre Ids: {}", tmdbMovie.title(), tmdbMovie.genre_ids());
+            // Build full URLs from TMDb's relative paths
+            String posterUrl = buildImageUrl(TMDB_POSTER_BASE_URL, tmdbMovie.poster_path());
+            String backdropUrl = buildImageUrl(TMDB_BACKDROP_BASE_URL, tmdbMovie.backdrop_path());
 
             // Map TMDb genre IDs -> our human-readable genre names
             var genreNames = mapTmdbGenreIdsToNames(tmdbMovie.genre_ids());
-
-            log.info("Movie: {} Genre Names: {}", tmdbMovie.title(), genreNames);
 
             // Extract release year
             Integer releaseYear = extractYear(tmdbMovie.release_date());
@@ -113,6 +111,8 @@ public class MovieSeeder implements CommandLineRunner {
                     releaseYear,
                     null,          // runtime not included in list responses; could be fetched via detail later
                     tmdbId,
+                    posterUrl,
+                    backdropUrl,
                     genreNames
             );
 
@@ -145,6 +145,23 @@ public class MovieSeeder implements CommandLineRunner {
 
 
     /// Helpers
+
+
+    // Base URLs for TMDb images. Will store the full URL on the Movie entity.
+    private static final String TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p/w500";
+    private static final String TMDB_BACKDROP_BASE_URL = "https://image.tmdb.org/t/p/w780";
+
+
+    /**
+     * Build a full image URL from a TMDb base URL and a relative path like "/abc123.jpg".
+     * Returns null if the path is null/blank so we don't store junk values.
+     */
+    private String buildImageUrl(String baseUrl, String path) {
+        if (path == null || path.isBlank()) {
+            return null;
+        }
+        return baseUrl + path;
+    }
 
 
     /**

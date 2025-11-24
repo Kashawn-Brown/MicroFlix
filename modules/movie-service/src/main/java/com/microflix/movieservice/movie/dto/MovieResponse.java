@@ -11,6 +11,8 @@ public record MovieResponse(
         Integer releaseYear,
         Integer runtime,
         Long tmdbId,
+        String posterUrl,
+        String backdropUrl,
         List<String> genres,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt

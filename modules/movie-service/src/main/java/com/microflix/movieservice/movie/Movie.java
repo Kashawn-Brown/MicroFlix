@@ -36,6 +36,12 @@ public class Movie {
     @Column(name = "tmdb_id", unique = true)
     private Long tmdbId;
 
+    @Column(name = "poster_url")
+    private String posterUrl;      // Full URL to poster image (or null if unknown)
+
+    @Column(name = "backdrop_url")
+    private String backdropUrl;    // Full URL to backdrop image (or null if unknown)
+
     @OneToMany(
             mappedBy = "movie",
             cascade = CascadeType.ALL,      // Whenever you save/update/remove a Movie, JPA cascades those operations to its MovieGenre children

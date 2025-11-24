@@ -8,6 +8,8 @@ public record TmdbMovieResult(
         String title,
         String overview,
         String release_date,
+        String poster_path,      // relative path like "/abc123.jpg"
+        String backdrop_path,
         Long runtime,
         List<Integer> genre_ids         // Raw TMDb genre IDs (e.g. [28, 878, 53])
         ) {}

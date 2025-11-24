@@ -56,6 +56,8 @@ public class MovieService {         // Encapsulates business logic for movie ope
         movie.setReleaseYear(request.releaseYear());
         movie.setRuntime(request.runtime());
         movie.setTmdbId(request.tmdbId());
+        movie.setPosterUrl(request.posterUrl());
+        movie.setBackdropUrl(request.backdropUrl());
 
         // Apply genres from the request
         applyGenresToMovie(movie, request.genres());
@@ -89,6 +91,8 @@ public class MovieService {         // Encapsulates business logic for movie ope
                 movie.getReleaseYear(),
                 movie.getRuntime(),
                 movie.getTmdbId(),
+                movie.getPosterUrl(),
+                movie.getBackdropUrl(),
                 genreNames,
                 movie.getCreatedAt(),
                 movie.getUpdatedAt()
