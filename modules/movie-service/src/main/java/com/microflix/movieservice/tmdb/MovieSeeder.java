@@ -3,6 +3,8 @@ package com.microflix.movieservice.tmdb;
 
 import com.microflix.movieservice.movie.Movie;
 import com.microflix.movieservice.movie.MovieRepository;
+import com.microflix.movieservice.movie.MovieService;
+import com.microflix.movieservice.movie.dto.CreateMovieRequest;
 import com.microflix.movieservice.tmdb.dto.TmdbMovieListResponse;
 import com.microflix.movieservice.tmdb.dto.TmdbMovieResult;
 import org.slf4j.Logger;
@@ -13,6 +15,9 @@ import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Seeds the local movie database with data fetched from TMDb.
@@ -25,11 +30,13 @@ public class MovieSeeder implements CommandLineRunner {
     // Logging seeding progress and skips for easier debugging.
     private static final Logger log = LoggerFactory.getLogger(MovieSeeder.class);
 
+    private final MovieService movieService;
     private final MovieRepository movieRepository;
     private final TmdbClient tmdbClient;
 
-    public MovieSeeder(MovieRepository movieRepository, TmdbClient tmdbClient) {
-        this.movieRepository = movieRepository;
+    public MovieSeeder(MovieService movieService, MovieRepository movieRepository, TmdbClient tmdbClient) {
+        this.movieService  = movieService;
+        this.movieRepository  = movieRepository;
         this.tmdbClient = tmdbClient;
     }
 
@@ -43,7 +50,8 @@ public class MovieSeeder implements CommandLineRunner {
 
         log.info("MovieSeeder started");
 
-        int inserted = seedMovies(tmdbClient.fetchPopularMovies(), "Popular Movies");
+        int inserted = 0;
+        inserted += seedMovies(tmdbClient.fetchPopularMovies(), "Popular Movies");
         inserted += seedMovies(tmdbClient.fetchTopRatedMovies(), "Top Rated Movies");
         inserted += seedMovies(tmdbClient.fetchNowPlayingMovies(), "Now Playing Movies");
         inserted += seedMovies(tmdbClient.fetchUpcomingMovies(), "Upcoming Movies");
@@ -57,7 +65,7 @@ public class MovieSeeder implements CommandLineRunner {
     /// Helper
 
     /**
-     * Takes the list of movies of API response and seeds into db
+     * Takes the list of movies from API response and seeds into DB
      * Idempotent: skips movies that already exist (based on tmdbid)
      */
     private int seedMovies(TmdbMovieListResponse movieList, String listName) {
@@ -75,29 +83,42 @@ public class MovieSeeder implements CommandLineRunner {
             // If tmdbId is missing, we can't dedupe properly, so we skip it
             if (tmdbId == null) {
                 skipped++;
-                log.debug("Movie Skipped: {}", tmdbMovie.title());
+                log.debug("Movie Skipped (missing tmdbId): {}", tmdbMovie.title());
                 continue;
             }
 
             // If we already have this movie, skip (idempotent seeding)
             if (movieRepository.existsByTmdbId(tmdbId)) {
                 skipped++;
-                log.debug("Movie Skipped: {}", tmdbMovie.title());
+                log.debug("Movie Skipped (already exists): {}", tmdbMovie.title());
                 continue;
             }
 
-            Movie movie = new Movie();
-            movie.setTitle(tmdbMovie.title());
-            movie.setOverview(tmdbMovie.overview());
-            movie.setReleaseYear(extractYear(tmdbMovie.release_date()));
-            movie.setRuntime(null);         // runtime is not included in the movie list response
-            movie.setTmdbId(tmdbId);
+//            log.info("Movie: {}", tmdbMovie.title());
 
-            // createdAt/updatedAt will be set by @PrePersist, but setting them here is also safe
-            movie.setCreatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-            movie.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+            log.info("Movie: {} Genre Ids: {}", tmdbMovie.title(), tmdbMovie.genre_ids());
 
-            movieRepository.save(movie);
+            // Map TMDb genre IDs -> our human-readable genre names
+            var genreNames = mapTmdbGenreIdsToNames(tmdbMovie.genre_ids());
+
+            log.info("Movie: {} Genre Names: {}", tmdbMovie.title(), genreNames);
+
+            // Extract release year
+            Integer releaseYear = extractYear(tmdbMovie.release_date());
+
+            // Build the same DTO that the controller uses when creating movies manually
+            var request = new CreateMovieRequest(
+                    tmdbMovie.title(),
+                    tmdbMovie.overview(),
+                    releaseYear,
+                    null,          // runtime not included in list responses; could be fetched via detail later
+                    tmdbId,
+                    genreNames
+            );
+
+            // Delegate to MovieService so it can handle genres + MovieGenre join rows
+            movieService.createMovie(request);
+
             inserted++;
         }
 
@@ -120,5 +141,54 @@ public class MovieSeeder implements CommandLineRunner {
             return null;
         }
     }
+
+
+
+    /// Helpers
+
+
+    /**
+     * Convert TMDb genre IDs from a TmdbMovieResult into a list of human-readable names,
+     * filtering out any IDs we don't know about.
+     */
+    private List<String> mapTmdbGenreIdsToNames(List<Integer> genreIds) {
+        if (genreIds == null) {
+            return List.of();
+        }
+
+        return genreIds.stream()
+                .map(TMDB_GENRE_MAP::get)          // id -> name (may be null if unknown)
+                .filter(Objects::nonNull)      // drop unknown IDs
+                .distinct()                        // avoid duplicates
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+    }
+
+
+    // Minimal TMDb genre ID -> Name map for seeding
+    private static final Map<Integer, String> TMDB_GENRE_MAP = Map.ofEntries(
+            Map.entry(28, "Action"),
+            Map.entry(12, "Adventure"),
+            Map.entry(16, "Animation"),
+            Map.entry(35, "Comedy"),
+            Map.entry(80, "Crime"),
+            Map.entry(99, "Documentary"),
+            Map.entry(18, "Drama"),
+            Map.entry(10751, "Family"),
+            Map.entry(14, "Fantasy"),
+            Map.entry(36, "History"),
+            Map.entry(27, "Horror"),
+            Map.entry(10402, "Music"),
+            Map.entry(9648, "Mystery"),
+            Map.entry(10749, "Romance"),
+            Map.entry(878, "Science Fiction"),
+            Map.entry(10770, "TV Movie"),
+            Map.entry(53, "Thriller"),
+            Map.entry(10752, "War"),
+            Map.entry(37, "Western")
+    );
+
+
+
 
 }

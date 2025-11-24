@@ -48,15 +48,19 @@ public interface RatingRepository extends JpaRepository<Rating, Long> {
      *  - how many ratings there are
      *
      * If there are no ratings for this movie, the Optional will be empty.
+     *
+     * movieId → RatingSummary.getMovieId()
+     * averageTimesTen → RatingSummary.getAverageTimesTen()
+     * count → RatingSummary.getCount()
      */
     @Query("""
-           select r.movieId as movieId,                         -- will map to getMovieId()
-                  avg(r.ratingTimesTen) as averageTimesTen,     -- maps to getAverageTimesTen()
-                  count(r.id) as count                          -- maps to getCount()
-           from Rating r
-           where r.movieId = :movieId                           -- :movieId comes from the method parameter
-           group by r.movieId
-           """)
+    select r.movieId as movieId,
+           avg(r.ratingTimesTen) as averageTimesTen,
+           count(r.id) as count
+    from Rating r
+    where r.movieId = :movieId
+    group by r.movieId
+    """)
     Optional<RatingSummaryProjection> findSummaryByMovieId(Long movieId);
 
 }

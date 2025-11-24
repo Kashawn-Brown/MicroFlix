@@ -1,10 +1,14 @@
 package com.microflix.movieservice.movie;
 
+import com.microflix.movieservice.genre.Genre;
+import com.microflix.movieservice.genre.MovieGenre;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.HashSet;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -32,11 +36,39 @@ public class Movie {
     @Column(name = "tmdb_id", unique = true)
     private Long tmdbId;
 
+    @OneToMany(
+            mappedBy = "movie",
+            cascade = CascadeType.ALL,      // Whenever you save/update/remove a Movie, JPA cascades those operations to its MovieGenre children
+            orphanRemoval = true
+    )
+    private Set<MovieGenre> movieGenres = new HashSet<>();
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+
+
+
+
+    ///  Helper Methods
+
+
+    // Helps attach a genre to a movie in a nice, readable way (keeps both sides in sync + hides complexity)
+    public void addGenre(Genre genre) {
+        var movieGenre = new MovieGenre(this, genre);
+        movieGenres.add(movieGenre);
+    }
+
+    // Empties the set.
+    // With orphanRemoval = true, this deletes all movie_genres entries linked to that movie on flush.
+    public void clearGenres() {
+        // Removing from the set + orphanRemoval = true will delete join rows
+        movieGenres.clear();
+    }
+
+
 
     // Initialize timestamps on insert.
     @PrePersist
