@@ -38,6 +38,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/ratings").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/ratings").authenticated()
 
+
+                        .requestMatchers("/api/v1/engagements/**").authenticated()       // Need to be authenticated to manipulate lists
+
                         // Read operations on ratings are public for now
                         .requestMatchers(HttpMethod.GET, "/api/v1/ratings/**").permitAll()
 

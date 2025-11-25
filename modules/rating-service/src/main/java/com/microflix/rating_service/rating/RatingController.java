@@ -77,7 +77,18 @@ public class RatingController {         // Handles HTTP requests related to rati
     }
 
     /**
-     * Returns all ratings created by a given user.
+     * Returns all a users ratings they made. (uses Token)
+     */
+    @GetMapping("/user")
+    public ResponseEntity<List<RatingResponse>> getUsersRatings(@AuthenticationPrincipal CurrentUser user) {
+
+        var response = service.getAllUserRatings(user.id());
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Returns all ratings created by a given user. (Uses user id in URL)
      */
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<RatingResponse>> getAllUserRatings(@PathVariable UUID userId) {
@@ -124,7 +135,7 @@ public class RatingController {         // Handles HTTP requests related to rati
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{movieId}")
     public ResponseEntity<?> deleteRating(
             @AuthenticationPrincipal CurrentUser user,
             @PathVariable Long movieId

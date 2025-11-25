@@ -28,7 +28,7 @@ spring:
             - id: rating-service
               uri: lb://rating-service
               predicates:
-                - Path=/api/v1/ratings/**      # Match /api/v1/ratings/**
+                - Path=/api/v1/ratings/**, /api/v1/engagements/**      # Match /api/v1/ratings/** and /api/v1/engagements/**
 
 
 eureka:
