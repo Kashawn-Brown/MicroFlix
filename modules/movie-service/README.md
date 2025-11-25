@@ -72,7 +72,18 @@ On startup, Flyway runs `V1__create_movies_table.sql` and creates a `movies` tab
 
 The `tmdb_id` field lets the service link local movies to TMDb data. It is currently nullable so I can create local-only movies as well as TMDb-backed ones.
 
+In later migrations I also added:
+
+- A `genres` table – stores distinct genre names (e.g. "Action", "Comedy", "Sci-Fi").
+- A `movie_genres` join table – links movies to genres using `(movie_id, genre_id)` with a uniqueness constraint so the same genre isn’t duplicated for a movie.
+- Two extra columns on `movies`:
+  - `poster_path` – path to the movie poster image from TMDb (when available).
+  - `backdrop_path` – path to the backdrop image from TMDb (when available).
+
+These are all internal to movie-service and are exposed to clients as simple string fields and a `List<String> genres` on the `MovieResponse` DTO.
+
 ---
+
 
 ## How I start the stack
 
@@ -110,28 +121,61 @@ At this point:
 
 I use these calls to confirm everything is working end-to-end via the gateway.
 
-### **List all movies**
+### **List / search movies (with filters and pagination)**
+
+```bash
+curl "http://localhost:8081/api/v1/movies?query=inception&genre=Action&year=2010&sort=created_desc&page=0&size=20"
+````
+
+The endpoint supports:
+
+* `query` (optional) – case-insensitive substring match on `title`.
+* `genre` (optional) – exact genre name (case-insensitive), e.g. `Action`, `Comedy`.
+* `year` (optional) – exact `releaseYear`, e.g. `2010`.
+* `sort` (optional) – simple sort key, e.g.:
+
+  * `created_desc` (default)
+  * `created_asc`
+  * `title_asc` / `title_desc`
+  * `year_asc` / `year_desc`
+* `page` (optional) – zero-based page index, default `0`.
+* `size` (optional) – page size, default `20`.
+
+The response is a Spring `Page<MovieResponse>`, which serializes to JSON like:
+
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "title": "Inception",
+      "overview": "A thief who steals corporate secrets...",
+      "releaseYear": 2010,
+      "runtime": 148,
+      "tmdbId": 27205,
+      "posterPath": "/qmDpIHrmpJINaRKAfWQfftjCdyi.jpg",
+      "backdropPath": "/s3TBrRGB1iav7gFOCNx3H31MoES.jpg",
+      "genres": ["Action", "Science Fiction"],
+      "createdAt": "2025-11-17T20:26:35.490Z",
+      "updatedAt": "2025-11-17T20:26:35.490Z"
+    }
+  ],
+  "pageable": { "...": "..." },
+  "totalElements": 42,
+  "totalPages": 3,
+  "number": 0,
+  "size": 20
+}
+```
+
+If you call it with no query params:
 
 ```bash
 curl http://localhost:8081/api/v1/movies
 ```
 
-If I’ve seeded data (see TMDb seeding below) or created some movies manually, I expect a `200 OK` with a JSON array of `MovieResponse` objects:
+you get the first page of movies sorted by `createdAt` descending.
 
-```json
-[
-  {
-    "id": 1,
-    "title": "Inception",
-    "overview": "A thief who steals corporate secrets...",
-    "releaseYear": 2010,
-    "runtime": 148,
-    "tmdbId": 27205,
-    "createdAt": "2025-11-17T20:26:35.490Z",
-    "updatedAt": "2025-11-17T20:26:35.490Z"
-  }
-]
-```
 
 ### **Get a specific movie by id**
 
@@ -188,6 +232,9 @@ This is **opt-in** and controlled by configuration so it doesn’t surprise me i
     * If `tmdbId` is `null` → it is skipped.
     * If a movie with that `tmdbId` already exists → it is skipped (idempotent).
     * Otherwise a new row is created in `movies`
+    * Poster and backdrop paths from TMDb are stored on the movie so the frontend can display images.
+    * TMDb genre IDs are mapped to genre names and saved into the `genres` + `movie_genres` tables, so each seeded movie comes with a `genres` list.
+
 
 
 ### **Configuration**

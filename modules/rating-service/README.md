@@ -66,6 +66,18 @@ On startup, Flyway runs `V1__create_ratings_table.sql` and creates a `ratings` t
 
 There is a unique constraint on `(user_id, movie_id)`, so each user can only have **one rating per movie**.
 
+
+
+A later migration adds an `engagements` table to support watchlist-style features:
+
+- `id BIGSERIAL PRIMARY KEY`
+- `user_id UUID NOT NULL` – logical FK to `user-service` users
+- `movie_id BIGINT NOT NULL` – logical FK to `movie-service` movies
+- `type VARCHAR(32) NOT NULL` – engagement type enum (e.g. `WATCHLIST`, `FAVOURITE`, `LIKE`)
+- `created_at TIMESTAMPTZ NOT NULL`
+
+There is a unique constraint on `(user_id, movie_id, type)`, so a user can only have one engagement of a given type for a movie (e.g. one `WATCHLIST` row per `(user, movie)`).
+
 ---
 
 ## How I start the stack 
@@ -106,6 +118,7 @@ All endpoints are rooted at:
 ```text
 /api/v1/ratings
 ```
+For write operations, `userId` comes from the authenticated user (JWT) rather than the request body. Read operations are public.
 
 When I call them through the gateway, I use:
 
@@ -113,26 +126,24 @@ When I call them through the gateway, I use:
 http://localhost:8081/api/v1/ratings
 ```
 
-### Create or upsert a rating
+### Create or upsert a rating (current user)
 
 **POST** `/api/v1/ratings`
 
-* Temporarily, I pass `userId` in the request body.
-* Later, this will come from the authenticated user (JWT).
+Requires a valid JWT from user-service. The `userId` is taken from the token; the body only needs movie + score.
 
 **Request body:**
 
 ```json
 {
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
   "movieId": 1,
   "rate": 8.7
 }
-```
+````
 
 Behavior:
 
-* If a rating for `(userId, movieId)` does **not** exist, a new row is created.
+* If a rating for `(currentUserId, movieId)` does **not** exist, a new row is created.
 * If it **does** exist, the existing rating is updated (upsert).
 
 **Sample 201 response:**
@@ -142,30 +153,33 @@ Behavior:
   "id": 1,
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "movieId": 1,
-  "rating": 8.7,
+  "rate": 8.7,
   "createdAt": "2025-11-19T04:20:00Z",
   "updatedAt": "2025-11-19T04:20:00Z"
 }
 ```
 
+
 ---
 
-### Update an existing rating
+### Update an existing rating (current user)
 
 **PATCH** `/api/v1/ratings`
+
+Requires JWT. Uses the current user from the token and the `movieId` + new `rate` from the body.
 
 **Request body:**
 
 ```json
 {
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
   "movieId": 1,
   "rate": 9.2
 }
-```
+````
 
-If the rating exists for `(userId, movieId)`, it updates the stored score.
-If it does **not** exist, the service throws `RatingNotFoundException` and returns a `404` ProblemDetail response (see Errors below).
+If the rating exists for `(currentUserId, movieId)`, it updates the stored score.
+
+If it does **not** exist, the service throws `RatingNotFoundException` and returns a `404` ProblemDetail response.
 
 ---
 
@@ -204,6 +218,21 @@ Sample response:
 
 ---
 
+### Get all ratings for the current user (via JWT)
+
+**GET** `/api/v1/ratings/user`
+
+Requires JWT. Uses the current user from the token.
+
+
+```http
+GET http://localhost:8081/api/v1/ratings/user
+```
+
+Returns a list of `RatingResponse` for the authenticated user across all movies.
+
+---
+
 ### Get all ratings for a user
 
 **GET** `/api/v1/ratings/user/{userId}`
@@ -238,6 +267,97 @@ GET http://localhost:8081/api/v1/ratings/1
 ```
 
 Returns the rating with the given `id`, or a `404` ProblemDetail if it doesn’t exist.
+
+---
+
+### Delete the current user's rating for a movie
+
+**DELETE** `/api/v1/ratings/movie/{movieId}`
+
+```http
+DELETE http://localhost:8081/api/v1/ratings/movie/1
+Authorization: Bearer <JWT>
+````
+
+Deletes the rating for `(currentUserId, movieId)` if it exists. This is idempotent from the client’s perspective:
+
+* If a rating existed and was deleted → `204 No Content`.
+* If no rating existed for that pair → still `204 No Content`.
+
+---
+
+## Watchlist / engagements API
+
+The rating-service also exposes a simple watchlist feature using an `engagements` table. For now, only the `WATCHLIST` engagement type is used.
+
+All of these endpoints require a valid JWT; the `userId` comes from the token.
+
+Base path (through the gateway):
+
+```text
+http://localhost:8081/api/v1/engagements
+````
+
+### Add a movie to the current user's watchlist
+
+**PUT** `/api/v1/engagements/watchlist/{movieId}`
+
+```http
+PUT http://localhost:8081/api/v1/engagements/watchlist/1
+Authorization: Bearer <JWT>
+```
+
+Behavior:
+
+* If the movie is not yet on the user's watchlist, a new `WATCHLIST` engagement row is created.
+* If it is already on the watchlist, the call is a no-op.
+
+Response:
+
+* `204 No Content` on success.
+
+### Remove a movie from the current user's watchlist
+
+**DELETE** `/api/v1/engagements/watchlist/{movieId}`
+
+```http
+DELETE http://localhost:8081/api/v1/engagements/watchlist/1
+Authorization: Bearer <JWT>
+```
+
+Behavior:
+
+* Deletes the `WATCHLIST` engagement for `(currentUserId, movieId)` if it exists.
+* Idempotent: if it wasn't there, you still get `204 No Content`.
+
+### Get the current user's watchlist
+
+**GET** `/api/v1/engagements/watchlist`
+
+```http
+GET http://localhost:8081/api/v1/engagements/watchlist
+Authorization: Bearer <JWT>
+```
+
+Returns a JSON array of engagements for the current user. Example:
+
+```json
+[
+  {
+    "userId": "550e8400-e29b-41d4-a716-446655440000",
+    "movieId": 1,
+    "type": "WATCHLIST",
+    "addedAt": "2025-11-21T12:00:00Z"
+  },
+  {
+    "userId": "550e8400-e29b-41d4-a716-446655440000",
+    "movieId": 42,
+    "type": "WATCHLIST",
+    "addedAt": "2025-11-20T09:30:00Z"
+  }
+]
+```
+
 
 ---
 
@@ -360,10 +480,13 @@ If everything is green, I know the core behavior of rating-service is stable.
 
 ## Authentication & error shape
 
-For rating writes, I rely on the JWT issued by the user-service.
+For rating writes and watchlist operations, I rely on the JWT issued by the user-service:
 
-- `POST /api/v1/ratings` and `PATCH /api/v1/ratings` require a valid JWT.
-- All `GET /api/v1/ratings/**` endpoints are **public** (anyone can view ratings).
+- `POST /api/v1/ratings`, `PATCH /api/v1/ratings`, `DELETE /api/v1/ratings/movie/{movieId}` all require a valid JWT.
+- Watchlist endpoints under `/api/v1/engagements/watchlist/**` also require JWT.
+- Read-only endpoints (`GET /api/v1/ratings/**` and `GET /api/v1/engagements/watchlist`) are public only in the sense that they don't require extra roles; they still use the current user for `/user` and watchlist calls.
+
+The `userId` always comes from the authenticated principal (`CurrentUser`) rather than from the request body.
 
 I send the token as:
 
@@ -392,9 +515,6 @@ Other rating errors (like “rating not found” or invalid score) are handled b
 
 Later improvements I plan to make:
 
-* Integrate **JWT auth** so `userId` comes from the authenticated user instead of the request body.
-* Add endpoints for aggregate stats (e.g. average rating per movie).
-* Potentially share a common `CurrentUser` pattern across services, similar to user-service.
 
 ---
 

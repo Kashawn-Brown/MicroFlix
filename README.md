@@ -11,8 +11,8 @@ Right now the focus is on a solid `user-service` with proper auth, profile manag
 Current modules:
 
 - `modules/user-service` – user registration, login (JWT), and profile (`/users/me`, update profile, change password).
-- `modules/movie-service` – movie metadata service with basic CRUD and optional TMDb-based seeding.
-- `modules/rating-service` – movie ratings service (1–10 scale with 0.1 increments; per-user per-movie ratings).
+- `modules/movie-service` – movie metadata service with basic CRUD, search/filter/sort + pagination, and optional TMDb-based seeding.
+- `modules/rating-service` – movie ratings service (1–10 scale with 0.1 increments; per-user per-movie ratings) + simple watchlist feature via an engagement table.
 - `modules/gateway` – Spring Cloud Gateway entrypoint for the API.
 - `modules/discovery` – Eureka discovery server.
 - `docker/` – Docker Compose setup for running the local stack.
