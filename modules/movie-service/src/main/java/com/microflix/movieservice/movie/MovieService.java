@@ -3,11 +3,16 @@ package com.microflix.movieservice.movie;
 import com.microflix.movieservice.common.errors.MovieNotFoundException;
 import com.microflix.movieservice.genre.Genre;
 import com.microflix.movieservice.genre.GenreRepository;
+import com.microflix.movieservice.genre.MovieGenre;
 import com.microflix.movieservice.movie.dto.CreateMovieRequest;
 import com.microflix.movieservice.movie.dto.MovieResponse;
 import com.microflix.movieservice.tmdb.MovieSeeder;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -65,6 +70,80 @@ public class MovieService {         // Encapsulates business logic for movie ope
         var newMovie = movieRepository.save(movie);
 
         return toMovieResponse(newMovie);
+    }
+
+    public List<MovieResponse> searchMovies(
+            String query,
+            String genre,
+            Integer year,
+            String sort
+    ) {
+        // Normalize input: treat blank strings as null
+        String normalizedQuery = (query == null || query.isBlank()) ? null : query.trim();  // cond ? true : false
+        String normalizedGenre = (genre == null || genre.isBlank()) ? null : genre.trim();
+        String normalizedSort = (sort == null || sort.isBlank()) ? "created_desc" : sort.trim(); // default to created_desc if empty
+
+
+        // Start with an "always true" specification (cb.conjunction()) -> a conjunction with zero conjuncts (A conjunction with zero conjuncts is true)
+        Specification<Movie> mainSpecification = (root, cq, cb) -> cb.conjunction();
+
+        // Filter: title contains query (case-insensitive)
+        if (normalizedQuery != null) {
+
+            // Building title Specification
+            Specification<Movie> titleSpecification = (root, cq, cb) ->
+                    cb.like(
+                            cb.lower(root.get("title")),
+                            "%" + normalizedQuery.toLowerCase() + "%"
+                    );
+
+            // Adding to main specification
+            mainSpecification = mainSpecification.and(titleSpecification);
+        }
+
+        // Filter: exact release year
+        if (year != null) {
+
+            // Building year specification
+            Specification<Movie> yearSpec = (root, cq, cb) ->
+                    cb.equal(root.get("releaseYear"), year);
+
+            // Adding to main specification
+            mainSpecification = mainSpecification.and(yearSpec);
+        }
+
+        // Filter: genre name (joining Movie -> MovieGenre -> Genre)
+        if (normalizedGenre != null) {
+
+            // BUilding genre specification
+            Specification<Movie> genreSpec = (root, cq, cb) -> {
+                // join movies.movieGenres as mg
+                Join<Movie, MovieGenre> mg = root.join("movieGenres", JoinType.LEFT);
+                // then join mg.genre as g
+                Join<MovieGenre, Genre> g = mg.join("genre", JoinType.LEFT);
+
+                // prevent duplicates when a movie has multiple genres
+                assert cq != null;
+                cq.distinct(true);
+
+                return cb.equal(cb.lower(g.get("name")), normalizedGenre.toLowerCase());
+            };
+
+            // Adding to main specification
+            mainSpecification = mainSpecification.and(genreSpec);
+        }
+
+        // Decide how to sort the results based on the sortKey
+        Sort sorting = mapSort(normalizedSort);  // mapSort will return a Sort object that Spring Data uses to generate ORDER BY in SQL
+
+
+        // "Give me all movies that match the rules in spec, sorted according to sort"
+        var movies = movieRepository.findAll(mainSpecification, sorting);
+
+        // Map each movie in list of movies to a movie response and return list
+        return movies.stream()
+                .map(this::toMovieResponse)
+                .toList();
     }
 
 
@@ -129,6 +208,29 @@ public class MovieService {         // Encapsulates business logic for movie ope
                     // Link this movie to the genre via a MovieGenre join entity
                     movie.addGenre(genre);
                 });
+    }
+
+
+
+    /**
+     * Map a simple sort key string into a Spring Sort.
+     * Supported keys:
+     *  - created_desc (default)
+     *  - created_asc
+     *  - title_asc / title_desc
+     *  - year_asc / year_desc
+     */
+    private Sort mapSort(String sortKey) {
+
+        return switch (sortKey) {
+            case "created_asc" -> Sort.by(Sort.Direction.ASC, "createdAt");
+            case "title_asc" -> Sort.by(Sort.Direction.ASC, "title");
+            case "title_desc" -> Sort.by(Sort.Direction.DESC, "title");
+            case "year_asc" -> Sort.by(Sort.Direction.ASC, "releaseYear");
+            case "year_desc" -> Sort.by(Sort.Direction.DESC, "releaseYear");
+            case "created_desc" -> Sort.by(Sort.Direction.DESC, "createdAt");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt"); // fallback
+        };
     }
 
 

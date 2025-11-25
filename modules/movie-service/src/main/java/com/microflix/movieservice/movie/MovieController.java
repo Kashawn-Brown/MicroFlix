@@ -18,16 +18,16 @@ public class MovieController {
         this.movieService = movieService;
     }
 
-    /**
-     * Returns all movies.
-     */
-    @GetMapping
-    public ResponseEntity<List<MovieResponse>> getAllMovies() {
-
-        var response = movieService.getAllMovies();
-
-        return ResponseEntity.ok(response);
-    }
+//    /**
+//     * Returns all movies.
+//     */
+//    @GetMapping
+//    public ResponseEntity<List<MovieResponse>> getAllMovies() {
+//
+//        var response = movieService.getAllMovies();
+//
+//        return ResponseEntity.ok(response);
+//    }
 
     /**
      * Returns a single movie by its id.
@@ -50,5 +50,31 @@ public class MovieController {
         var response = movieService.createMovie(request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * List / search movies with optional filters:
+     *  - query: text search on title (contains, case-insensitive)
+     *  - genre: exact genre name (case-insensitive), e.g. "Action"
+     *  - year: release year, e.g. 2010
+     *  - sort: sort key, e.g. "created_desc" (default), "title_asc", "year_desc"
+     *
+     * Examples:
+     *  GET /api/v1/movies
+     *  GET /api/v1/movies?query=inception
+     *  GET /api/v1/movies?genre=Action&year=2010
+     *  GET /api/v1/movies?sort=title_asc
+     */
+    @GetMapping
+    public ResponseEntity<List<MovieResponse>> searchMovies(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String genre,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false, defaultValue = "created_desc") String sort
+    ) {
+
+        var response = movieService.searchMovies(query, genre, year, sort);
+
+        return ResponseEntity.ok(response);
     }
 }
