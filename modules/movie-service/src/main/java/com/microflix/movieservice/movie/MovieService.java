@@ -11,6 +11,8 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -30,15 +32,15 @@ public class MovieService {         // Encapsulates business logic for movie ope
         this.genreRepository = genreRepository;
     }
 
-    /**
-     * Returns all movies; mapped to response DTOs.
-     */
-    public List<MovieResponse> getAllMovies() {
-        return movieRepository.findAll()
-                .stream()
-                .map(this::toMovieResponse)
-                .toList();
-    }
+//    /**
+//     * Returns all movies; mapped to response DTOs.
+//     */
+//    public List<MovieResponse> getAllMovies() {
+//        return movieRepository.findAll()
+//                .stream()
+//                .map(this::toMovieResponse)
+//                .toList();
+//    }
 
     /**
      * Returns a single movie by id or throws if not found.
@@ -72,11 +74,17 @@ public class MovieService {         // Encapsulates business logic for movie ope
         return toMovieResponse(newMovie);
     }
 
-    public List<MovieResponse> searchMovies(
+    /**
+     * Searches movies with optional filters and sorting, returning a page of results.
+     * Replaces the old "get all movies" method.
+     */
+    public Page<MovieResponse> searchMovies(
             String query,
             String genre,
             Integer year,
-            String sort
+            String sort,
+            int page,
+            int size
     ) {
         // Normalize input: treat blank strings as null
         String normalizedQuery = (query == null || query.isBlank()) ? null : query.trim();  // cond ? true : false
@@ -136,14 +144,14 @@ public class MovieService {         // Encapsulates business logic for movie ope
         // Decide how to sort the results based on the sortKey
         Sort sorting = mapSort(normalizedSort);  // mapSort will return a Sort object that Spring Data uses to generate ORDER BY in SQL
 
+        // Creating a page request
+        PageRequest pageRequest = PageRequest.of(page, size, sorting);
 
-        // "Give me all movies that match the rules in spec, sorted according to sort"
-        var movies = movieRepository.findAll(mainSpecification, sorting);
+        // "Give me a page of movies that match the rules in spec, sorted according to sort"
+        Page<Movie> pageResult = movieRepository.findAll(mainSpecification, pageRequest);
 
         // Map each movie in list of movies to a movie response and return list
-        return movies.stream()
-                .map(this::toMovieResponse)
-                .toList();
+        return pageResult.map(this::toMovieResponse);
     }
 
 

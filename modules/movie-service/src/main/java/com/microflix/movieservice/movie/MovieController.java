@@ -2,6 +2,7 @@ package com.microflix.movieservice.movie;
 
 import com.microflix.movieservice.movie.dto.CreateMovieRequest;
 import com.microflix.movieservice.movie.dto.MovieResponse;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -66,14 +67,16 @@ public class MovieController {
      *  GET /api/v1/movies?sort=title_asc
      */
     @GetMapping
-    public ResponseEntity<List<MovieResponse>> searchMovies(
+    public ResponseEntity<Page<MovieResponse>> searchMovies(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String genre,
             @RequestParam(required = false) Integer year,
-            @RequestParam(required = false, defaultValue = "created_desc") String sort
+            @RequestParam(required = false, defaultValue = "created_desc") String sort,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int size
     ) {
 
-        var response = movieService.searchMovies(query, genre, year, sort);
+        var response = movieService.searchMovies(query, genre, year, sort, page, size);
 
         return ResponseEntity.ok(response);
     }
