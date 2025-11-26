@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { fetchMoviesPage, type Movie } from "../../lib/movie-api";
 import { ApiError } from "../../lib/api-client";
 
@@ -89,8 +90,9 @@ export default function MoviesPage() {
       {!loading && !errorMessage && movies.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
           {movies.map((movie) => (
-            <article
+            <Link
               key={movie.id}
+              href={`/movies/${movie.id}`}
               className="flex flex-col overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40"
             >
               {/* Poster for movies */}
@@ -127,7 +129,7 @@ export default function MoviesPage() {
                   </p>
                 )}
               </div>
-            </article>
+            </Link>
           ))}
         </div>
       )}

@@ -27,11 +27,19 @@ export type Page<T> = {
  * For now just support page + size; add filters later.
  */
 export async function fetchMoviesPage(page = 0, size = 12): Promise<Page<Movie>> {
-    
+
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
   });
 
   return apiFetch<Page<Movie>>(`/movie-service/api/v1/movies?${params}`);
+}
+
+/**
+ * Fetch a single movie by id from the movie-service via the gateway.
+ * Used by the movie details page.
+ */
+export async function fetchMovieById(id: number): Promise<Movie> {
+  return apiFetch<Movie>(`/movie-service/api/v1/movies/${id}`);
 }
