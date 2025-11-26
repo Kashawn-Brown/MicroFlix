@@ -38,9 +38,11 @@ export default function RegisterPage() {
       
     } catch (error) {
       if (error instanceof ApiError) {
+
         const detail =
           error.problem?.detail || error.problem?.title || "Registration failed.";
         setErrorMessage(detail);
+        
       } else {
         setErrorMessage("Something went wrong. Please try again.");
       }
