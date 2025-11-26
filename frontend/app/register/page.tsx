@@ -1,17 +1,33 @@
 import Link from "next/link";
 
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <section className="mx-auto flex w-full max-w-md flex-col gap-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Create your account
+        </h1>
         <p className="text-sm text-slate-300">
-          Use your MicroFlix account to rate movies and manage your watchlist.
+          Sign up to start rating movies and building your watchlist.
         </p>
       </div>
 
-      {/* Well wire this form up to the backend later */}
-      <form className="space-y-4"> 
+      {/* Will hook this up to /auth/register */}
+      <form className="space-y-4">
+        <div className="space-y-1">
+          <label
+            htmlFor="displayName"
+            className="block text-sm font-medium text-slate-200"
+          >
+            Display name
+          </label>
+          <input
+            id="displayName"
+            type="text"
+            className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
+        </div>
+
         <div className="space-y-1">
           <label
             htmlFor="email"
@@ -37,7 +53,7 @@ export default function LoginPage() {
           <input
             id="password"
             type="password"
-            autoComplete="current-password"
+            autoComplete="new-password"
             className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
           />
         </div>
@@ -46,14 +62,14 @@ export default function LoginPage() {
           type="submit"
           className="w-full rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400"
         >
-          Sign in
+          Create account
         </button>
       </form>
 
       <p className="text-xs text-slate-400">
-        Don&apos;t have an account?{" "}
-        <Link href="/register" className="text-sky-300 hover:text-sky-200">
-          Create one
+        Already have an account?{" "}
+        <Link href="/login" className="text-sky-300 hover:text-sky-200">
+          Sign in
         </Link>
         .
       </p>
@@ -61,4 +77,4 @@ export default function LoginPage() {
   );
 }
 
-// LOGIN PAGE //
+// REGISTER PAGE //
