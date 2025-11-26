@@ -5,6 +5,7 @@ import com.microflix.movieservice.genre.Genre;
 import com.microflix.movieservice.genre.GenreRepository;
 import com.microflix.movieservice.genre.MovieGenre;
 import com.microflix.movieservice.movie.dto.CreateMovieRequest;
+import com.microflix.movieservice.movie.dto.GenreResponse;
 import com.microflix.movieservice.movie.dto.MovieResponse;
 import com.microflix.movieservice.tmdb.MovieSeeder;
 import jakarta.persistence.criteria.Join;
@@ -17,6 +18,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -242,5 +244,12 @@ public class MovieService {         // Encapsulates business logic for movie ope
     }
 
 
+    public List<GenreResponse> listGenres() {
 
+        return genreRepository.findAll().stream()
+                .sorted(Comparator.comparing(Genre::getName))
+                .map(g -> new GenreResponse(g.getId(), g.getName()))
+                .toList();
+
+    }
 }

@@ -20,6 +20,9 @@ type MoviesPageProps = {
   }>;
 };
 
+const PAGE_SIZE_OPTIONS = [15, 20, 25, 30];
+
+
 // helper for pagination links (builds URLSearchParams without page parameter)
 function buildBaseParams(
   query?: string,
@@ -48,11 +51,11 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
     year = "",
     sort = "",
     page = "0",
-    size = "12",
+    size = "15",
   } = resolved;
 
   const pageIndex = Number(page) || 0;
-  const pageSize = Number(size) || 12;
+  const pageSize = Number(size) || 15;
   const yearNumber = year ? Number(year) : undefined;
 
   let moviesPage: PageType<Movie> | null = null;
@@ -92,6 +95,47 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
 
   const hasPrev = currentPage > 0;
   const hasNext = totalPages > 0 && currentPage < totalPages - 1;
+
+  // Build URLs for a given page index, keeping filters + size.
+  const makePageQuery = (pageIndex: number) => {
+    const params = new URLSearchParams(baseParams);
+    params.set("page", String(pageIndex));
+    return params.toString();
+  };
+
+  // Build URLs for changing page size (reset page back to 0).
+  const makeSizeQuery = (size: number) => {
+    const params = new URLSearchParams(baseParams);
+    params.set("size", String(size));
+    params.set("page", "0");
+    return params.toString();
+  };
+
+  // Build a compact list of page indices, with -1 used as "ellipsis".
+  const pageItems: number[] = [];
+  if (totalPages <= 7) {
+    for (let i = 0; i < totalPages; i++) {
+      pageItems.push(i);
+    }
+  } else {
+    pageItems.push(0); // first page
+
+    if (currentPage > 3) {
+      pageItems.push(-1); // left ellipsis
+    }
+
+    const start = Math.max(1, currentPage - 1);
+    const end = Math.min(totalPages - 2, currentPage + 1);
+    for (let i = start; i <= end; i++) {
+      pageItems.push(i);
+    }
+
+    if (currentPage < totalPages - 4) {
+      pageItems.push(-1); // right ellipsis
+    }
+
+    pageItems.push(totalPages - 1); // last page
+  }
 
   const prevParams = new URLSearchParams(baseParams);
   prevParams.set("page", String(Math.max(currentPage - 1, 0)));
@@ -188,17 +232,21 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
               <option value="year_asc">Year asc</option>
             </select>
           </div>
-
-          {/* Keep page size, but reset page to 0 when applying filters. */}
-          <input type="hidden" name="size" value={pageSize} />
-          <input type="hidden" name="page" value="0" />
-
-          <button
-            type="submit"
-            className="rounded-md bg-sky-500 px-3 py-1 text-xs font-medium text-slate-950 hover:bg-sky-400 md:self-end"
-          >
-            Apply
-          </button>
+          
+          <div className="flex gap-2 md:self-end">
+            <Link
+              href="/movies"
+              className="rounded-md border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200 hover:border-slate-400 hover:text-slate-100"
+            >
+              Reset
+            </Link>
+            <button
+              type="submit"
+              className="rounded-md bg-sky-500 px-3 py-1 text-xs font-medium text-slate-950 hover:bg-sky-400 md:self-end"
+            >
+              Apply
+            </button>
+          </div>
         </form>
       </div>
 
@@ -214,7 +262,7 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
         </p>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {moviesPage.content.map((movie) => (
               <Link
                 key={movie.id}
@@ -257,27 +305,76 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
           </div>
 
           {/* Pagination controls */}
-          <div className="mt-4 flex items-center justify-between text-xs text-slate-300">
-            <p>
-              Page {currentPage + 1} of {totalPages || 1}
-            </p>
-            <div className="flex items-center gap-2">
-              {hasPrev && (
-                <Link
-                  href={`/movies?${prevParams.toString()}`}
-                  className="rounded-md border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200 hover:border-sky-400 hover:text-sky-200"
-                >
-                  ← Previous
-                </Link>
-              )}
-              {hasNext && (
-                <Link
-                  href={`/movies?${nextParams.toString()}`}
-                  className="rounded-md border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200 hover:border-sky-400 hover:text-sky-200"
-                >
-                  Next →
-                </Link>
-              )}
+          <div className="mt-4 flex flex-col gap-2 text-xs text-slate-300">
+            {/* Top row: page status + numbered pages + prev/next */}
+            <div className="flex flex-col items-center justify-between gap-2 md:flex-row">
+              <p>
+                Page {currentPage + 1} of {totalPages || 1}
+              </p>
+
+              <div className="flex items-center gap-2">
+                {hasPrev && (
+                  <Link
+                    href={`/movies?${makePageQuery(currentPage - 1)}`}
+                    className="rounded-md border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200 hover:border-sky-400 hover:text-sky-200"
+                  >
+                    ← Previous
+                  </Link>
+                )}
+
+                {/* Numbered pages */}
+                {pageItems.map((p, index) =>
+                  p === -1 ? (
+                    <span key={`ellipsis-${index}`} className="px-1 text-slate-500">
+                      …
+                    </span>
+                  ) : (
+                    <Link
+                      key={p}
+                      href={`/movies?${makePageQuery(p)}`}
+                      className={[
+                        "rounded-md px-2 py-1",
+                        p === currentPage
+                          ? "border border-sky-500 bg-sky-500/10 text-sky-200"
+                          : "border border-transparent text-slate-300 hover:border-slate-600 hover:text-slate-100",
+                      ].join(" ")}
+                    >
+                      {p + 1}
+                    </Link>
+                  )
+                )}
+
+                {hasNext && (
+                  <Link
+                    href={`/movies?${makePageQuery(currentPage + 1)}`}
+                    className="rounded-md border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200 hover:border-sky-400 hover:text-sky-200"
+                  >
+                    Next →
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom row: page size selector, right-aligned */}
+            <div className="flex w-full items-center justify-center gap-2">
+              <span className="text-slate-400">Page size:</span>
+              {PAGE_SIZE_OPTIONS.map((sizeOption) => {
+                const isActive = sizeOption === pageSize;
+                return (
+                  <Link
+                    key={sizeOption}
+                    href={`/movies?${makeSizeQuery(sizeOption)}`}
+                    className={[
+                      "rounded-md px-2 py-1",
+                      isActive
+                        ? "border border-sky-500 bg-sky-500/10 text-sky-200"
+                        : "border border-transparent text-slate-300 hover:border-slate-600 hover:text-slate-100",
+                    ].join(" ")}
+                  >
+                    {sizeOption}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </>

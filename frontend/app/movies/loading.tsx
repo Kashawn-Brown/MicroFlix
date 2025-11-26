@@ -1,5 +1,5 @@
 export default function LoadingMovies() {
-  const items = Array.from({ length: 6 });
+  const items = Array.from({ length: 15 });
 
   return (
     <section className="flex w-full flex-col gap-4">
@@ -11,7 +11,7 @@ export default function LoadingMovies() {
       </div>
 
       {/* Simple skeleton grid while movies load */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {items.map((_, index) => (
           <div
             key={index}

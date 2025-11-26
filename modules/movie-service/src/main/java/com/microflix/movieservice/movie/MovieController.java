@@ -1,6 +1,7 @@
 package com.microflix.movieservice.movie;
 
 import com.microflix.movieservice.movie.dto.CreateMovieRequest;
+import com.microflix.movieservice.movie.dto.GenreResponse;
 import com.microflix.movieservice.movie.dto.MovieResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -79,5 +80,14 @@ public class MovieController {
         var response = movieService.searchMovies(query, genre, year, sort, page, size);
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/genres")
+    public ResponseEntity<List<GenreResponse>> listGenres() {
+
+        var response = movieService.listGenres();
+
+        return ResponseEntity.ok(response);
+
     }
 }
