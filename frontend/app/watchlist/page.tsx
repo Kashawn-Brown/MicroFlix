@@ -1,14 +1,20 @@
+// Client-side Watchlist page: loads user's watchlist + movie details and lets them remove items
+
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { loadAuth } from "../../lib/auth-storage";
-import { fetchWatchlist, removeFromWatchlist, type EngagementItem } from "../../lib/engagement-api";
+import {
+  fetchWatchlist,
+  removeFromWatchlist,
+  type EngagementItem,
+} from "../../lib/engagement-api";
 import { fetchMovieById, type Movie } from "../../lib/movie-api";
 import { ApiError } from "../../lib/api-client";
 
-
+// Combined type to store 1 clean list of Watchlist entries
 type WatchlistEntry = {
   movie: Movie;
   addedAt: string;
@@ -40,6 +46,7 @@ export default function WatchlistPage() {
     setToken(token);
     setDisplayName(stored.displayName ?? null);
 
+    // cancellation flag in case the component unmounts before async calls finish
     let cancelled = false;
 
     async function loadWatchlist() {
@@ -47,6 +54,7 @@ export default function WatchlistPage() {
       setErrorMessage(null);
 
       try {
+        // Fetch users watchlist
         const engagements: EngagementItem[] = await fetchWatchlist(token);
 
         if (cancelled) return;
@@ -63,6 +71,7 @@ export default function WatchlistPage() {
 
         if (cancelled) return;
 
+        // Combine each engagement with its corresponding movie by index
         const combined: WatchlistEntry[] = engagements.map((eng, index) => ({
           movie: movies[index],
           addedAt: eng.addedAt,
@@ -99,6 +108,7 @@ export default function WatchlistPage() {
     };
   }, []);
 
+  // Handler to remove a movie from watchlist
   async function handleRemove(movieId: number) {
     if (!token) return;
     setRemovingId(movieId);
@@ -122,6 +132,7 @@ export default function WatchlistPage() {
     }
   }
 
+  // Page to show if user not authenticated
   if (!authPresent && !loading) {
     return (
       <section className="flex w-full flex-col gap-4">
@@ -161,10 +172,7 @@ export default function WatchlistPage() {
       ) : entries.length === 0 ? (
         <p className="text-sm text-slate-300">
           Your watchlist is empty. Browse{" "}
-          <Link
-            href="/movies"
-            className="text-sky-300 hover:text-sky-200"
-          >
+          <Link href="/movies" className="text-sky-300 hover:text-sky-200">
             Movies
           </Link>{" "}
           and add some titles to get started.
@@ -240,6 +248,5 @@ export default function WatchlistPage() {
     </section>
   );
 }
-
 
 // USERS WATCHLIST PAGE //

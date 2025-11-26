@@ -22,18 +22,56 @@ export type Page<T> = {
   size: number;   // page size
 };
 
+// Flexible search/filter options for retrieving movies
+export type MovieSearchOptions = {
+  page?: number;
+  size?: number;
+  query?: string;
+  genre?: string;
+  year?: number;
+  sort?: string;
+};
+
 /**
  * Fetch a page of movies from the movie-service via the gateway.
- * For now just support page + size; add filters later.
+ * Support page + size + filters & sorting+.
  */
-export async function fetchMoviesPage(page = 0, size = 12): Promise<Page<Movie>> {
+export async function fetchMoviesPage(options: MovieSearchOptions = {}): Promise<Page<Movie>> {
 
+  // destructure options (and give defaults where needed)
+  const {
+    page = 0,
+    size = 12,
+    query,
+    genre,
+    year,
+    sort
+  } = options;
+  
+  // Start building the query parameters
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
   });
 
-  return apiFetch<Page<Movie>>(`/movie-service/api/v1/movies?${params}`);
+  //Conditionally adding filters + sorting (Only include if present and non-empty)
+  if (query && query.trim().length > 0) {
+    params.set("query", query.trim());
+  }
+  if (genre && genre.trim().length > 0) {
+    params.set("genre", genre.trim());
+  }
+  if (typeof year === "number" && !Number.isNaN(year)) {
+    params.set("year", String(year));
+  }
+  if (sort && sort.trim().length > 0) {
+    params.set("sort", sort.trim());
+  }
+
+  return apiFetch<Page<Movie>>(
+    `/movie-service/api/v1/movies?${params.toString()}`
+  );
+
 }
 
 /**
