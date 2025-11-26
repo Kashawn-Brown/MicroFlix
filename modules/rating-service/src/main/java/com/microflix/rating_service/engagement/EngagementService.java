@@ -58,4 +58,11 @@ public class EngagementService {
                 .map(e -> new EngagementItemResponse(userId, e.getMovieId(), EngagementType.WATCHLIST, e.getCreatedAt()))
                 .toList();
     }
+
+    /**
+     * Check if the given movie is in the user's watchlist.
+     */
+    public boolean inWatchlist(Long movieId, UUID userId) {
+        return engagementRepository.existsByUserIdAndMovieIdAndType(userId, movieId, EngagementType.WATCHLIST);
+    }
 }

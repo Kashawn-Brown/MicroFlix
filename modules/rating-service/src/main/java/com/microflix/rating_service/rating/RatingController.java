@@ -79,7 +79,7 @@ public class RatingController {         // Handles HTTP requests related to rati
     /**
      * Returns all a users ratings they made. (uses Token)
      */
-    @GetMapping("/user")
+    @GetMapping("/me")
     public ResponseEntity<List<RatingResponse>> getUsersRatings(@AuthenticationPrincipal CurrentUser user) {
 
         var response = service.getAllUserRatings(user.id());
@@ -97,6 +97,21 @@ public class RatingController {         // Handles HTTP requests related to rati
 
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Returns a specific user's rating for a given movie.
+     */
+    @GetMapping("/movie/{movieId}/me")
+    public ResponseEntity<RatingResponse> getUsersRatingForMovie(
+            @AuthenticationPrincipal CurrentUser user,
+            @PathVariable Long movieId
+    ) {
+
+        var response = service.getUserRatingForMovie(movieId, user.id());
+
+        return ResponseEntity.ok(response);
+    }
+
 
     /**
      * Returns a specific user's rating for a given movie.

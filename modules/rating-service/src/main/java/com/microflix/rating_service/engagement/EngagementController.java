@@ -60,4 +60,15 @@ public class EngagementController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Get if a movie is currently in a users watchlist
+     */
+    @GetMapping("/watchlist/{movieId}/me")
+    public ResponseEntity<Boolean> inWatchlist(@AuthenticationPrincipal CurrentUser user, @PathVariable Long movieId ) {
+
+        var response = engagementService.inWatchlist(movieId, user.id());
+
+        return ResponseEntity.ok(response);
+    }
+
 }

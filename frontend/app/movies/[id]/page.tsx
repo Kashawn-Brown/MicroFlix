@@ -1,10 +1,11 @@
-// Server-side Movie Details page: loads movie + rating summary by id and shows a detailed view with error handling
+// Client-side Movie Details page: loads movie + rating summary by id and shows a detailed view with error handling
 
 import Image from "next/image";
 import Link from "next/link";
 import { fetchMovieById, type Movie } from "../../../lib/movie-api";
 import {fetchRatingSummary, type RatingSummary,} from "../../../lib/rating-api";
 import { ApiError } from "../../../lib/api-client";
+import MovieActions from "../../../components/movie-actions";
 
 // In Next 15, params is a Promise, so we type it that way.
 type MovieDetailsPageProps = {
@@ -82,7 +83,7 @@ export default async function MovieDetailsPage({params,}: MovieDetailsPageProps)
       ? summary.average.toFixed(1)
       : null;
 
-      
+
   return (
     <section className="flex w-full flex-col gap-6">
       <Link
@@ -150,8 +151,11 @@ export default async function MovieDetailsPage({params,}: MovieDetailsPageProps)
             )}
           </div>
 
-          {/* Next step: client-side rating + watchlist controls */}
+          {/* Client-side controls for your rating + watchlist */}
+          <MovieActions movieId={movieId} />
         </div>
+
+
       </div>
     </section>
   );
