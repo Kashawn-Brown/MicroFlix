@@ -240,7 +240,7 @@ export default function MovieActions({ movieId }: MovieActionsProps) {
     // How page is rendered when user is logged in
     return (
         <div className="mt-3 flex flex-col gap-4 rounded-md border border-slate-800 bg-slate-900/60 p-3 text-sm">
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 border-b border-slate-800">
             <p className="text-xs text-slate-400">
             Signed in as{" "}
             <span className="font-medium text-slate-100">
@@ -353,9 +353,28 @@ export default function MovieActions({ movieId }: MovieActionsProps) {
                 )}
                 </div>
 
-                {/* Watchlist section – keep as is, or just leave your existing JSX here */}
+                {/* Watchlist section */}
                 <div className="flex flex-1 flex-col gap-2">
-                {/* existing watchlist content */}
+                    <h3 className="text-sm font-semibold text-slate-100">
+                    Watchlist
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                    {inWatchlist
+                        ? "This movie is on your watchlist."
+                        : "Add this movie to your watchlist to find it later."}
+                    </p>
+                    <button
+                    type="button"
+                    onClick={handleToggleWatchlist}
+                    disabled={togglingWatchlist}
+                    className="mt-1 w-fit rounded-md border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200 hover:border-sky-400 hover:text-sky-200 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                    {togglingWatchlist
+                        ? "Updating…"
+                        : inWatchlist
+                        ? "Remove from watchlist"
+                        : "Add to watchlist"}
+                    </button>
                 </div>
             </div>
         )}
