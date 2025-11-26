@@ -4,6 +4,12 @@ import type { AuthResponse } from "./auth-api";
 
 const STORAGE_KEY = "microflix_auth";
 
+// Helper function let let app know when auth has been changed
+function notifyAuthChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("microflix-auth-changed"));
+}
+
 /**
  * Save auth info (including JWT) to localStorage.
  * MVP approach: simple and easy to debug.
@@ -13,6 +19,7 @@ export function saveAuth(auth: AuthResponse) {
     
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
+        notifyAuthChanged();
     } catch {
         // Swallow errors – storage is a convenience, not critical path
     }
@@ -42,6 +49,7 @@ export function clearAuth() {
     
     try {
         localStorage.removeItem(STORAGE_KEY);
+        notifyAuthChanged();
     } catch {
         // ignore
     }

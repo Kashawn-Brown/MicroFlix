@@ -5,7 +5,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { loadAuth } from "../../lib/auth-storage";
+import { useRouter } from "next/navigation";
+import { loadAuth, clearAuth } from "../../lib/auth-storage";
 import {
   fetchWatchlist,
   removeFromWatchlist,
@@ -21,6 +22,8 @@ type WatchlistEntry = {
 };
 
 export default function WatchlistPage() {
+  const router = useRouter();
+
   const [authPresent, setAuthPresent] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -82,9 +85,12 @@ export default function WatchlistPage() {
         if (cancelled) return;
 
         if (error instanceof ApiError && error.status === 401) {
+          // Token expired/invalid – global logout
+          clearAuth();
           setAuthPresent(false);
           setToken(null);
           setDisplayName(null);
+          router.push("/login")
         } else if (error instanceof ApiError) {
           const detail =
             error.problem?.detail ||

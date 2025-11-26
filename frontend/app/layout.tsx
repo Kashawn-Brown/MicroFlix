@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+import AuthHeader from "../components/auth-header";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,10 +36,11 @@ export default function RootLayout({
                 <Link href="/watchlist" className="hover:text-sky-400">
                   Watchlist
                 </Link>
-                <Link href="/login" className="hover:text-sky-400">
-                  Login
-                </Link>
               </div>
+              <div>
+                <AuthHeader />
+              </div>
+              
             </nav>
           </header>
 

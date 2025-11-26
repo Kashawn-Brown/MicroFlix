@@ -4,7 +4,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { loadAuth } from "../lib/auth-storage";
+import { useRouter } from "next/navigation";
+import { loadAuth, clearAuth } from "../lib/auth-storage";
 import {
     deleteMyRating,
     fetchMyRatingForMovie,
@@ -23,6 +24,9 @@ type MovieActionsProps = {
 };
 
 export default function MovieActions({ movieId }: MovieActionsProps) {
+
+    const router = useRouter();
+
     // Components to keep track of
     const [authPresent, setAuthPresent] = useState(false);
     const [token, setToken] = useState<string | null>(null);
@@ -89,9 +93,11 @@ export default function MovieActions({ movieId }: MovieActionsProps) {
 
                 if (error instanceof ApiError && error.status === 401) {
                     // Token expired/invalid – treat as logged out for now.
+                    clearAuth();
                     setAuthPresent(false);
                     setToken(null);
                     setDisplayName(null);
+                    router.push("/login")
                 } else if (error instanceof ApiError) {
                     const detail =
                         error.problem?.detail ||
