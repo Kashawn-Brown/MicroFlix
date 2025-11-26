@@ -34,7 +34,7 @@ export default async function MovieDetailsPage({params,}: MovieDetailsPageProps)
 
   // Variables for data and error handling
   let movie: Movie | null = null;
-  let summary: RatingSummary | null = null;
+  let ratingSummary: RatingSummary | null = null;
   let errorMessage: string | null = null;
 
   try {
@@ -47,7 +47,7 @@ export default async function MovieDetailsPage({params,}: MovieDetailsPageProps)
 
     // Set the movie data and summary
     movie = movieData;
-    summary = summaryData;
+    ratingSummary = summaryData;
 
   } catch (error) { 
     if (error instanceof ApiError) {
@@ -79,8 +79,8 @@ export default async function MovieDetailsPage({params,}: MovieDetailsPageProps)
 
   // Retrive average ratings, and make sure it is presentable
   const average =
-    summary && summary.average !== null
-      ? summary.average.toFixed(1)
+    ratingSummary && ratingSummary.average !== null
+      ? ratingSummary.average.toFixed(1)
       : null;
 
 
@@ -133,23 +133,32 @@ export default async function MovieDetailsPage({params,}: MovieDetailsPageProps)
             </p>
           )}
 
-          <div className="mt-2 rounded-md border border-slate-800 bg-slate-900/60 p-3 text-sm">
-            <h2 className="text-sm font-semibold text-slate-100">
-              Ratings
-            </h2>
-            {summary && summary.count > 0 && average ? (
-              <p className="mt-1 text-slate-200">
-                Average rating:{" "}
-                <span className="font-semibold">{average}</span>/10 from{" "}
-                <span className="font-semibold">{summary.count}</span>{" "}
-                rating{summary.count === 1 ? "" : "s"}.
-              </p>
+          <section className="mt-4 rounded-md border border-slate-800 bg-slate-900/60 p-4">
+            <h2 className="text-sm font-semibold text-slate-100">Ratings</h2>
+
+            {ratingSummary && ratingSummary.count > 0 && ratingSummary.average !== null ? (
+              <div className="mt-3 flex items-baseline gap-3">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-semibold text-slate-100">
+                    {ratingSummary.average.toFixed(1)}
+                  </span>
+                  <span className="text-sm text-slate-400">/10</span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  from{" "}
+                  <span className="font-medium">
+                    {ratingSummary.count}
+                  </span>{" "}
+                  rating{ratingSummary.count === 1 ? "" : "s"}
+                </p>
+              </div>
             ) : (
-              <p className="mt-1 text-slate-400 text-sm">
-                No ratings yet. We&apos;ll add rating controls here soon.
+              <p className="mt-3 text-sm text-slate-300">
+                No ratings yet. Be the first to rate this movie.
               </p>
             )}
-          </div>
+          </section>
+          
 
           {/* Client-side controls for your rating + watchlist */}
           <MovieActions movieId={movieId} />
