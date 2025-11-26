@@ -2,12 +2,12 @@
 
 "use client";  // component runs in the browser
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { register } from "../../lib/auth-api";
 import { ApiError } from "../../lib/api-client";
-import { saveAuth } from "../../lib/auth-storage";
+import { loadAuth, saveAuth } from "../../lib/auth-storage";
 
 
 export default function RegisterPage() {
@@ -18,6 +18,19 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+      const stored = loadAuth();
+  
+      if (stored && stored.token) {
+        // Already signed in – send them to movies instead of showing login form.
+        router.push("/movies");
+        return;
+      }
+  
+      setCheckingAuth(false);
+    }, [router]);
 
   // Runs when user hits "Create Account"
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -49,6 +62,17 @@ export default function RegisterPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (checkingAuth) {
+    return (
+      <section className="mx-auto w-full max-w-md">
+        <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
+        <p className="mt-2 text-sm text-slate-300">
+          Checking your session…
+        </p>
+      </section>
+    );
   }
 
   return (

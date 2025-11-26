@@ -85,12 +85,12 @@ export default function WatchlistPage() {
         if (cancelled) return;
 
         if (error instanceof ApiError && error.status === 401) {
-          // Token expired/invalid – global logout
+          // Token expired/invalid – treat as a global logout.
           clearAuth();
           setAuthPresent(false);
           setToken(null);
           setDisplayName(null);
-          router.push("/login")
+          router.push("/login");
         } else if (error instanceof ApiError) {
           const detail =
             error.problem?.detail ||
@@ -112,7 +112,7 @@ export default function WatchlistPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   // Handler to remove a movie from watchlist
   async function handleRemove(movieId: number) {
@@ -156,6 +156,8 @@ export default function WatchlistPage() {
     );
   }
 
+  const skeletonItems = Array.from({ length: 6 });
+
   return (
     <section className="flex w-full flex-col gap-4">
       <h1 className="text-2xl font-semibold tracking-tight">Watchlist</h1>
@@ -174,11 +176,34 @@ export default function WatchlistPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-400">Loading your watchlist…</p>
+        // Skeleton grid while we load watchlist + movie details.
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {skeletonItems.map((_, index) => (
+            <div
+              key={index}
+              className="flex flex-col overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40"
+            >
+              <div className="aspect-[2/3] bg-slate-800 animate-pulse" />
+              <div className="flex flex-1 flex-col gap-2 p-3">
+                <div className="h-4 w-3/4 rounded bg-slate-800 animate-pulse" />
+                <div className="h-3 w-1/3 rounded bg-slate-800 animate-pulse" />
+                <div className="h-3 w-2/3 rounded bg-slate-800 animate-pulse" />
+                <div className="mt-2 h-3 w-1/2 rounded bg-slate-800 animate-pulse" />
+                <div className="mt-3 flex gap-2">
+                  <div className="h-7 w-20 rounded bg-slate-800 animate-pulse" />
+                  <div className="h-7 w-24 rounded bg-slate-800 animate-pulse" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : entries.length === 0 ? (
         <p className="text-sm text-slate-300">
           Your watchlist is empty. Browse{" "}
-          <Link href="/movies" className="text-sky-300 hover:text-sky-200">
+          <Link
+            href="/movies"
+            className="text-sky-300 hover:text-sky-200"
+          >
             Movies
           </Link>{" "}
           and add some titles to get started.
