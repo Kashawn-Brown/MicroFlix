@@ -30,6 +30,15 @@ spring:
               predicates:
                 - Path=/api/v1/ratings/**, /api/v1/engagements/**      # Match /api/v1/ratings/** and /api/v1/engagements/**
 
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:3000"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+        default-filters:
+          - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
 
 eureka:
   client:

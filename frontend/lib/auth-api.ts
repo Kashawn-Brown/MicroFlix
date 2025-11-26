@@ -1,25 +1,26 @@
-// lib/auth-api.ts
+// Handle backend auth routes
+
 import { apiFetch } from "./api-client";
 
 // Expected response when login/register succeeds
 export type AuthResponse = {
-  token: string;
-  email: string;
-  displayName: string;
-  roles: string;
+    token: string;
+    email: string;
+    displayName: string;
+    roles: string;
 };
 
 // Defining how to send login request
 export type LoginRequest = {
-  email: string;
-  password: string;
+    email: string;
+    password: string;
 };
 
 // Defining how to send register request
 export type RegisterRequest = {
-  email: string;
-  password: string;
-  displayName: string;
+    email: string;
+    password: string;
+    displayName: string;
 };
 
 
@@ -28,10 +29,10 @@ export type RegisterRequest = {
  */
 export async function login(request: LoginRequest): Promise<AuthResponse> {
 
-  return apiFetch<AuthResponse>("/user-service/api/v1/auth/login", {
-    method: "POST",
-    body: JSON.stringify(request),
-  });
+    return apiFetch<AuthResponse>("/user-service/api/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify(request),
+    });
 }
 
 
@@ -40,8 +41,8 @@ export async function login(request: LoginRequest): Promise<AuthResponse> {
  */
 export async function register(request: RegisterRequest): Promise<AuthResponse> {
 
-  return apiFetch<AuthResponse>("/user-service/api/v1/auth/register", {
-    method: "POST",
-    body: JSON.stringify(request),
-  });
+    return apiFetch<AuthResponse>("/user-service/api/v1/auth/register", {
+        method: "POST",
+        body: JSON.stringify(request),
+    });
 }
