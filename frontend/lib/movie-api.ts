@@ -22,6 +22,12 @@ export type Page<T> = {
   size: number;   // page size
 };
 
+// Expected response for retrieving genres
+export type Genre = {
+  id: number;
+  name: string;
+};
+
 // Flexible search/filter options for retrieving movies
 export type MovieSearchOptions = {
   page?: number;
@@ -81,3 +87,15 @@ export async function fetchMoviesPage(options: MovieSearchOptions = {}): Promise
 export async function fetchMovieById(id: number): Promise<Movie> {
   return apiFetch<Movie>(`/movie-service/api/v1/movies/${id}`);
 }
+
+
+/**
+ * Fetch the list of available genres from the movie-service via the gateway.
+ * Used to populate the genre dropdown on the Movies page.
+ */
+export async function fetchGenres(): Promise<Genre[]> {
+  return apiFetch<Genre[]>("/movie-service/api/v1/movies/genres");
+}
+
+
+

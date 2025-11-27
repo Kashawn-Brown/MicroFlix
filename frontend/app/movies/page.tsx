@@ -4,8 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   fetchMoviesPage,
+  fetchGenres,
   type Movie,
   type Page as PageType,
+  type Genre,
 } from "../../lib/movie-api";
 import { ApiError } from "../../lib/api-client";
 
@@ -58,8 +60,15 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
   const pageSize = Number(size) || 15;
   const yearNumber = year ? Number(year) : undefined;
 
+  // 2) NEW: normalize for the select
+  const selectedGenre =
+    typeof genre === "string" && genre.length > 0 ? genre : "";
+
   let moviesPage: PageType<Movie> | null = null;
   let errorMessage: string | null = null;
+
+  // List of genres for the filter dropdown
+  let genres: Genre[] = [];
 
   // Calling fetchMoviesPage with filters
   try {
@@ -80,6 +89,14 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
     } else {
       errorMessage = "Failed to load movies.";
     }
+  }
+
+  // Fetch genres for the dropdown; if this fails, we just fall back to "Any"
+  try {
+    genres = await fetchGenres();
+  } catch (error) {
+    // For now we just log and keep an empty list; UI will still work with "Any genre"
+    console.error("Failed to load genres", error);
   }
 
   const currentPage = moviesPage?.number ?? pageIndex;
@@ -157,6 +174,7 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
         {/* Filter form submits via GET so filters appear in the URL. */}
         <form
           method="GET"
+          key={`${query}-${genre}-${year}-${sort}-${pageSize}`}
           className="mt-2 flex flex-col gap-2 text-sm md:mt-0 md:flex-row md:items-end"
         >
           <div className="flex flex-col gap-1">
@@ -183,14 +201,20 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
             >
               Genre
             </label>
-            <input
+            <select
               id="genre"
               name="genre"
-              type="text"
-              defaultValue={genre}
-              placeholder="Action"
-              className="w-32 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
+              defaultValue={selectedGenre}
+              className="w-40 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              {/* Empty value means "no filter" */}
+              <option value="">Any Genre</option>
+              {genres.map((g) => (
+                <option key={g.id} value={g.name}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-col gap-1">
