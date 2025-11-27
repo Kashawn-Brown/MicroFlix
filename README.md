@@ -16,6 +16,7 @@ Current modules:
 - `modules/gateway` – Spring Cloud Gateway entrypoint for the API.
 - `modules/discovery` – Eureka discovery server.
 - `docker/` – Docker Compose setup for running the local stack.
+- `frontend/` – Next.js app that talks to the gateway and provides a simple UI for auth, browsing movies, rating, and watchlist management. :contentReference[oaicite:0]{index=0}
 
 Key technologies:
 
@@ -28,7 +29,7 @@ Key technologies:
 
 ---
 
-## Running the stack with Docker
+## Backend
 
 I use Docker Compose to run the core services together:
 
@@ -47,3 +48,26 @@ From the `docker/` directory:
 ```bash
 cd docker
 docker compose up --build
+```
+
+## Frontend (Next.js)
+
+The `frontend/` folder contains a small Next.js app that sits in front of the gateway:
+
+- **Stack:** Next.js (App Router) + TypeScript + React + Tailwind CSS.
+- **Backend integration:** All API calls go through the gateway on `http://localhost:8081` using typed helpers (auth, movies, ratings, watchlist).
+- **Auth:** Users can register/login against `user-service`. A JWT is stored in `localStorage` and sent as `Authorization: Bearer <token>` to protected endpoints. Expired tokens trigger a quiet “auto-logout” and redirect back to `/login`.
+- **Core screens:**
+    - Home page with a short intro, feature CTA, and a \"recently added\" rail.
+    - Movies list (`/movies`) with search, genre filter, year filter, sort options, pagination, and a page-size selector.
+    - Movie details (`/movies/[id]`) with poster/backdrop, genres, overview, rating summary, your rating (create/update/delete), and a watchlist toggle.
+    - Watchlist page (`/watchlist`) showing the user’s saved movies, with remove + link to details.
+    - Simple profile area with a \"My ratings\" page that lists all movies the user has rated.
+
+To run the frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
