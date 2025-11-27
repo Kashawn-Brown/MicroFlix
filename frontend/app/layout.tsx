@@ -54,3 +54,12 @@ export default function RootLayout({
 }
 
 // main layout of next.js app
+
+// RootLayout wraps the whole page with:
+    // Header (MicroFlix + navigation),
+    // Main area, etc.
+// This HomePage component is what gets passed in as {children} when you go to the home route /.
+
+// So the full page is:
+    // Top: header from RootLayout
+    // Middle: this HomePage content inside <main>

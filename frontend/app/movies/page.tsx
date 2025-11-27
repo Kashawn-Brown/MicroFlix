@@ -166,7 +166,7 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Movies</h1>
           <p className="text-sm text-slate-300">
-            Browse the MicroFlix catalog. Use search and filters to narrow down
+            Browse the MicroFlix catalog. <br/> Use search and filters to narrow down
             what you&apos;re looking for.
           </p>
         </div>
