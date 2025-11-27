@@ -34,8 +34,6 @@ export default function ProfilePage() {
 
     const token = stored.token;
 
-
-
     setAuthPresent(true);
     setDisplayName(stored.displayName ?? null);
     setEmail(stored.email ?? null);
@@ -211,10 +209,10 @@ export default function ProfilePage() {
                 Total movies you&apos;ve rated.
               </p>
               <Link
-                href="/movies"
+                href="/profile/ratings"
                 className="mt-2 inline-block text-[11px] font-medium text-sky-300 hover:text-sky-200"
               >
-                Browse movies →
+                View ratings →
               </Link>
             </div>
 

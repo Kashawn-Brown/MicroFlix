@@ -160,6 +160,12 @@ export default function WatchlistPage() {
 
   return (
     <section className="flex w-full flex-col gap-4">
+      <Link
+        href="/profile"
+        className="text-xs text-sky-300 hover:text-sky-200"
+      >
+        ← Back to profile
+      </Link>
       <h1 className="text-2xl font-semibold tracking-tight">Watchlist</h1>
 
       {displayName && (

@@ -58,7 +58,7 @@ export default function AuthHeader() {
   return (
     <div className="flex items-center gap-3 text-xs">
       <span className="text-slate-300">
-        Signed in as{" "}
+        Welcome, {" "}
         <Link
           href="/profile"
           className="font-medium text-sky-300 hover:text-sky-200"
