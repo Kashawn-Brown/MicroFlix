@@ -1,11 +1,70 @@
 // Client-side Movie Details page: loads movie + rating summary by id and shows a detailed view with error handling
 
+import type { Metadata, ResolvingMetadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { fetchMovieById, type Movie } from "../../../lib/movie-api";
 import {fetchRatingSummary, type RatingSummary,} from "../../../lib/rating-api";
 import { ApiError } from "../../../lib/api-client";
 import MovieActions from "../../../components/movie-actions";
+
+export async function generateMetadata(
+  { params }: MovieDetailsPageProps,
+  _parent: ResolvingMetadata
+): Promise<Metadata> {
+  const { id } = await params;
+  const movieId = Number(id);
+
+  if (Number.isNaN(movieId)) {
+    return {
+      title: "Movie not found – MicroFlix",
+    };
+  }
+
+  try {
+    const movie = await fetchMovieById(movieId);
+
+    if (!movie) {
+      return {
+        title: "Movie not found – MicroFlix",
+      };
+    }
+
+    const yearPart = movie.releaseYear ? ` (${movie.releaseYear})` : "";
+    const title = `${movie.title}${yearPart} – MicroFlix`;
+
+    const description =
+      movie.overview?.slice(0, 180) ||
+      `Details and ratings for ${movie.title} on MicroFlix.`;
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        images: movie.posterUrl
+          ? [
+              {
+                url: movie.posterUrl,
+                alt: movie.title,
+              },
+            ]
+          : undefined,
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
+      },
+    };
+  } catch {
+    // If the fetch fails, don’t break the page – just fall back.
+    return {
+      title: "Movie – MicroFlix",
+    };
+  }
+}
 
 // In Next 15, params is a Promise, so we type it that way.
 type MovieDetailsPageProps = {

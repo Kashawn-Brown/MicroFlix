@@ -1,5 +1,6 @@
 // Client-side Movies page: fetches a page of movies, handles loading/errors, and shows a simple movie grid
 
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -10,6 +11,10 @@ import {
   type Genre,
 } from "../../lib/movie-api";
 import { ApiError } from "../../lib/api-client";
+
+export const metadata: Metadata = {
+  title: "Movies – MicroFlix",
+};
 
 type MoviesPageProps = {
   searchParams?: Promise<{

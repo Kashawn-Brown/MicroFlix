@@ -1,8 +1,13 @@
 
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { fetchMoviesPage, type Movie } from "../lib/movie-api";
 import { ApiError } from "../lib/api-client";
+
+export const metadata: Metadata = {
+  title: "MicroFlix – Home",
+};
 
 export default async function HomePage() {
   let featured: Movie | null = null;
