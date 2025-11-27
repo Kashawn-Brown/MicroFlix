@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { loadAuth, clearAuth } from "../lib/auth-storage";
 
 type AuthState = {
@@ -12,27 +13,44 @@ type AuthState = {
 };
 
 export default function AuthHeader() {
+  const router = useRouter();
   const [auth, setAuth] = useState<AuthState | null>(null);
 
   useEffect(() => {
-    const stored = loadAuth();
-    if (!stored || !stored.token) {
-      setAuth(null);
-    } else {
-      setAuth({
-        displayName: stored.displayName ?? null,
-        email: stored.email ?? null,
-        token: stored.token,
-      });
+    
+    // helper to pull latest auth from localStorage
+    function syncFromStorage() {
+      const stored = loadAuth();
+      if (!stored || !stored.token) {
+        setAuth(null);
+      } else {
+        setAuth({
+          displayName: stored.displayName ?? null,
+          email: stored.email ?? null,
+          token: stored.token,
+        });
+      }
     }
+
+    // initial load
+    syncFromStorage();
+
+    // listen for global "auth changed" events
+    if (typeof window !== "undefined") {
+      window.addEventListener("microflix-auth-changed", syncFromStorage);
+      return () => {
+        window.removeEventListener("microflix-auth-changed", syncFromStorage);
+      };
+    }
+
   }, []);
 
   function handleLogout() {
     clearAuth();
     setAuth(null);
-    // For now, a simple hard reload is fine to refresh UI everywhere.
-    window.location.href = "/";
+    router.push("/login");
   }
+  console.log("auth: " + auth)
 
   if (!auth) {
     return (
@@ -56,7 +74,7 @@ export default function AuthHeader() {
   const label = auth.displayName || auth.email || "You";
 
   return (
-    <div className="flex items-center gap-3 text-xs">
+    <div className="flex items-center gap-3 text">
       <span className="text-slate-300">
         Welcome, {" "}
         <Link
