@@ -1,121 +1,75 @@
-// Auth header widget: syncs with localStorage auth and shows login/register or "signed in as X" + logout
-
-"use client";  // this runs in the browser
+// app/lib/auth-header.tsx
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { clearAuth, loadAuth } from "../lib/auth-storage";
+import { loadAuth, clearAuth } from "../lib/auth-storage";
 
-type AuthHeaderState = {
-  loading: boolean;
+type AuthState = {
   displayName: string | null;
-  authenticated: boolean;
+  email: string | null;
+  token: string | null;
 };
 
-/**
- * Small header fragment that shows auth state:
- * - "Login" link when signed out
- * - "Signed in as X · Logout" when signed in
- */
 export default function AuthHeader() {
-  const router = useRouter();
+  const [auth, setAuth] = useState<AuthState | null>(null);
 
-  // Initial states
-  const [state, setState] = useState<AuthHeaderState>({
-    loading: true,
-    displayName: null,
-    authenticated: false,
-  });
-
-  // Sync with localStorage + listen for changes
   useEffect(() => {
-
-    // Functions to look at localStorage and decide what to show
-    function syncFromStorage() {
-      const stored = loadAuth();
-    
-      if (!stored || !stored.token) {
-        setState({
-          loading: false,
-          displayName: null,
-          authenticated: false,
-        });
-        return;
-      }
-
-      setState({
-        loading: false,
+    const stored = loadAuth();
+    if (!stored || !stored.token) {
+      setAuth(null);
+    } else {
+      setAuth({
         displayName: stored.displayName ?? null,
-        authenticated: true,
+        email: stored.email ?? null,
+        token: stored.token,
       });
-
     }
-    
-    // Run once on mount
-    syncFromStorage();
-
-    // Listen for future auth changes
-    if (typeof window !== "undefined") {
-      window.addEventListener("microflix-auth-changed", syncFromStorage);
-    }
-
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("microflix-auth-changed", syncFromStorage);
-      }
-    };
-    
   }, []);
 
-  // Handler for user logout
   function handleLogout() {
     clearAuth();
-    // Simple redirect after logout.
-    router.push("/login");
+    setAuth(null);
+    // For now, a simple hard reload is fine to refresh UI everywhere.
+    window.location.href = "/";
   }
 
-  if (state.loading) {
-    return (
-      <div className="text-xs text-slate-400">
-        Checking session…
-      </div>
-    );
-  }
-
-  // What to show when user is not authenticated
-  if (!state.authenticated) {
+  if (!auth) {
     return (
       <div className="flex items-center gap-3 text-xs">
         <Link
           href="/login"
-          className="text-sky-300 hover:text-sky-200"
+          className="rounded-md bg-sky-500 px-3 py-1 text-xs font-medium text-slate-950 hover:bg-sky-400"
         >
           Login
         </Link>
-        <span className="text-slate-500">/</span>
         <Link
-          href="/register"
-          className="text-sky-300 hover:text-sky-200"
+          href="/login?mode=register"
+          className="rounded-md border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200 hover:border-sky-400 hover:text-sky-200"
         >
-          Register
+          Create account
         </Link>
       </div>
     );
   }
 
+  const label = auth.displayName || auth.email || "You";
+
   return (
-    <div className="flex items-center gap-3 text-xs text-slate-300">
-      <span>
+    <div className="flex items-center gap-3 text-xs">
+      <span className="text-slate-300">
         Signed in as{" "}
-        <span className="font-medium text-slate-100">
-          {state.displayName ?? "you"}
-        </span>
+        <Link
+          href="/profile"
+          className="font-medium text-sky-300 hover:text-sky-200"
+        >
+          {label}
+        </Link>
       </span>
       <button
         type="button"
         onClick={handleLogout}
-        className="rounded-md border border-slate-600 px-2 py-1 text-[11px] font-medium text-slate-200 hover:border-red-500 hover:text-red-200"
+        className="rounded-md border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200 hover:border-red-500 hover:text-red-200"
       >
         Logout
       </button>
