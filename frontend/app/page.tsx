@@ -5,6 +5,9 @@ import Link from "next/link";
 import { fetchMoviesPage, type Movie } from "../lib/movie-api";
 import { ApiError } from "../lib/api-client";
 
+// Do not pre-render page at build time. Run HomePage() on the server every time someone requests /
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "MicroFlix – Home",
 };
