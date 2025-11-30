@@ -1,0 +1,65 @@
+# MicroFlix/docker/docker-compose.prod.yml
+# This file only applies in the CLOUD (EC2).
+# It tweaks a few things on top of docker-compose.yml.
+
+services:
+  # --- Discovery server  ---
+  discovery:
+    # In prod it's often internal-only; if you want to see the UI from internet, keep this:
+    ports:
+      - "8761:8761"
+    restart: unless-stopped
+
+  # --- Gateway (API entry) ---
+  gateway:
+    restart: unless-stopped
+    environment:
+      # Use a 'prod' profile if you add it later
+      SPRING_PROFILES_ACTIVE: prod
+
+  # --- User service ---
+  user-service:
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    # In prod you usually don't expose microservices directly.
+    # They are reached via gateway. So we clear 'ports' to keep them internal:
+    ports: []
+
+  # --- Movie service ---
+  movie-service:
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    ports: []
+
+  # --- Rating service ---
+  rating-service:
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    ports: []
+
+  # --- Databases (user/movie/rating) ---
+  user-db:
+    restart: unless-stopped
+    # No public port exposure; only services in Docker network talk to it
+    ports: []
+
+  movie-db:
+    restart: unless-stopped
+    ports: []
+
+  rating-db:
+    restart: unless-stopped
+    ports: []
+
+  # --- Frontend (only public entry point we really need) ---
+  frontend:
+    restart: unless-stopped
+    # In prod we want "normal" web port 80
+    ports:
+      - "80:3000"
+    environment:
+      # Frontend talks to gateway *by container name* inside Docker
+      NEXT_PUBLIC_API_BASE_URL: http://gateway:8081
