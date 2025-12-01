@@ -15,13 +15,13 @@ services:
     restart: unless-stopped
     environment:
       # Use a 'prod' profile if you add it later
-      SPRING_PROFILES_ACTIVE: prod
+      # SPRING_PROFILES_ACTIVE: prod
 
   # --- User service ---
   user-service:
     restart: unless-stopped
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      # SPRING_PROFILES_ACTIVE: prod
     # In prod you usually don't expose microservices directly.
     # They are reached via gateway. So we clear 'ports' to keep them internal:
     ports: []
@@ -30,14 +30,14 @@ services:
   movie-service:
     restart: unless-stopped
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      # SPRING_PROFILES_ACTIVE: prod
     ports: []
 
   # --- Rating service ---
   rating-service:
     restart: unless-stopped
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      # SPRING_PROFILES_ACTIVE: prod
     ports: []
 
   # --- Databases (user/movie/rating) ---
