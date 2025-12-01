@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    
+jobs:
+  backend:
+    name: Backend (Maven)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # Remember all the jars we downloaded last time so we don’t have to download them again, unless our project’s POMs changed
+      # Don't need to re-download all dependencies every run
+      - name: Cache Maven repo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      # Run tests before deploying
+      - name: Run tests
+        working-directory: .
+        run: mvn -B clean test
+
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm    # cache the npm dependencies
+          cache-dependency-path: frontend/package-lock.json   # to know when dependencies changed
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # optional, if you have lint/tests:
+      - name: Run frontend build
+        working-directory: frontend
+        run: npm run build
