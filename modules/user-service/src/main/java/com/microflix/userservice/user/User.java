@@ -50,8 +50,6 @@ public class User {
     void onCreate() {
         if (email != null) email = email.toLowerCase();  // normalize
 
-        displayName = email;
-
         var now = OffsetDateTime.now(ZoneOffset.UTC);    // app-clock in UTC
         createdAt = now;
         updatedAt = now;
