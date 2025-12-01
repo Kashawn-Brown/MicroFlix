@@ -31,6 +31,7 @@ export class ApiError extends Error {
 }
 
 
+
 // For server-side fetches, we talk directly to the gateway URL.
 // In Docker on EC2: GATEWAY_BASE_URL=http://gateway:8081
 // In bare dev (npm run dev): GATEWAY_BASE_URL=http://localhost:8081
@@ -42,6 +43,21 @@ const GATEWAY_BASE_URL = process.env.GATEWAY_BASE_URL || "http://gateway:8081";
 // Use the URL from the env; otherwise, default to talk to backend running on localhost:8081
 const API_PREFIX = "/gateway";
 
+
+function buildUrl(path: string): string {
+  const isAbsolute = /^https?:\/\//i.test(path);
+
+  if (isAbsolute) {
+    return path;
+  }
+
+  if (path.startsWith("/gateway")) {
+    return path;
+  }
+
+  // Normal case: caller passes "/user-service/..." or "/movie-service/..."
+  return `${API_PREFIX}${path}`;
+}
 
 /**
  * Small wrapper around fetch for backend calls.
@@ -55,52 +71,16 @@ export async function apiFetch<T>(
     options: RequestInit = {}
 ): Promise<T> {
 
-    const isAbsoluteUrl = /^https?:\/\//i.test(path);
-    const isServer = typeof window === "undefined";
+    const url = buildUrl(path);
 
-
-    // Normalize the incoming path to always start with "/"
-    let normalizedPath: string;
-    if (isAbsoluteUrl) {
-        normalizedPath = path;
-    } else {
-        normalizedPath = path.startsWith("/") ? path : `/${path}`;
-    }
-
-
-    let url: string;
-
-    // Decide the final URL based on where we are:
-    if (isAbsoluteUrl) {
-        // Already full URL, just use it
-        url = normalizedPath;
-    } 
-    else if (isServer) {
-        // On server: call gateway directly.
-        let backendPath = normalizedPath.replace(/^\/gateway/, "");
-
-        // careful not to accidentally include "/gateway" twice
-        if (backendPath.startsWith(API_PREFIX)) {
-            backendPath = backendPath.slice(API_PREFIX.length); // drop "/gateway"
-            if (!backendPath.startsWith("/")) {
-                backendPath = `/${backendPath}`;
-            }
-        }
-        url = new URL(backendPath, GATEWAY_BASE_URL).toString();
-        
-        // Helpful debug for now (appears in `docker logs frontend`)
-        console.log("[apiFetch][server] ->", url);
+    // Basic logging while we debug
+    if (typeof window === "undefined") {
+        console.log("apiFetch[server] ->", url);
     } 
     else {
-        // In browser: call /gateway/... on frontend, rewrites handle the rest
-        let browserPath = normalizedPath;
-
-        if (!browserPath.startsWith(API_PREFIX)) {
-            browserPath = `${API_PREFIX}${browserPath}`;
-        }
-
-        url = browserPath;
+        console.log("apiFetch[browser] ->", url);
     }
+
 
     // Calling fetch to make HTTP request
     const response = await fetch(url, {
