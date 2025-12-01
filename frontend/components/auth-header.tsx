@@ -62,7 +62,7 @@ export default function AuthHeader() {
           Login
         </Link>
         <Link
-          href="/login?mode=register"
+          href="/register"
           className="rounded-md border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200 hover:border-sky-400 hover:text-sky-200"
         >
           Create account

@@ -44,7 +44,7 @@ export default function RegisterPage() {
       // Call backend via register function in auth-api
       const auth = await register({ email, password, displayName });
 
-      // If successful, get back authResponse + save to loacal storage
+      // If successful, get back authResponse + save to local storage
       saveAuth(auth);
       
       router.push("/movies");
