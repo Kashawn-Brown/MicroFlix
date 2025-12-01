@@ -31,9 +31,12 @@ spring:
                 - Path=/api/v1/ratings/**, /api/v1/engagements/**      # Match /api/v1/ratings/** and /api/v1/engagements/**
 
       globalcors:
+        add-to-simple-url-handler-mapping: true
         corsConfigurations:
           '[/**]':
-            allowedOrigins: "http://localhost:3000"
+            allowedOrigins: 
+            - "http://localhost:3000"
+            - "http://ec2-15-222-242-8.ca-central-1.compute.amazonaws.com"
             allowedMethods: "*"
             allowedHeaders: "*"
             allowCredentials: true
