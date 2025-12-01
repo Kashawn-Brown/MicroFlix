@@ -1,4 +1,5 @@
 # MicroFlix/docker/docker-compose.prod.yml
+# Override file for when deployed in EC2 (to override certain fields)
 # This file only applies in the CLOUD (EC2).
 # It tweaks a few things on top of docker-compose.yml.
 
@@ -10,12 +11,14 @@ services:
       - "8761:8761"
     restart: unless-stopped
 
+
   # --- Gateway (API entry) ---
   gateway:
     restart: unless-stopped
     environment:
       # Use a 'prod' profile if you add it later
       # SPRING_PROFILES_ACTIVE: prod
+
 
   # --- User service ---
   user-service:
@@ -24,35 +27,41 @@ services:
       # SPRING_PROFILES_ACTIVE: prod
     # In prod you usually don't expose microservices directly.
     # They are reached via gateway. So we clear 'ports' to keep them internal:
-    ports: []
+    ports: []   # override and clear any port mappings; still reachable on the internal Docker network by name
+
 
   # --- Movie service ---
   movie-service:
     restart: unless-stopped
     environment:
       # SPRING_PROFILES_ACTIVE: prod
-    ports: []
+    ports: []   # override and clear any port mappings; still reachable on the internal Docker network by name
+
 
   # --- Rating service ---
   rating-service:
     restart: unless-stopped
     environment:
       # SPRING_PROFILES_ACTIVE: prod
-    ports: []
+    ports: []   # override and clear any port mappings; still reachable on the internal Docker network by name
+
 
   # --- Databases (user/movie/rating) ---
   user-db:
     restart: unless-stopped
     # No public port exposure; only services in Docker network talk to it
-    ports: []
+    ports: []   
+
 
   movie-db:
     restart: unless-stopped
-    ports: []
+    ports: []   
+
 
   rating-db:
     restart: unless-stopped
-    ports: []
+    ports: []   
+
 
   # --- Frontend (only public entry point we really need) ---
   frontend:

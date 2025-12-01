@@ -16,30 +16,19 @@ const nextConfig: NextConfig = {
     ],
   },
 
-    // Rewrites: everything under /api/<service>/... goes to the gateway
+  // Rewrites: everything under /api/<service>/... goes to the gateway
   async rewrites() {
     return [
       {
-        // Match: /api/movie-service/... OR /api/rating-service/... OR /api/user-service/...
-        source:
-          "/gateway/:service(movie-service|rating-service|user-service)/:path*",
-        // Forward to the gateway, keeping the service + path
-        destination: `${GATEWAY_BASE_URL}/:service/:path*`,
+        // Any request to /gateway/** on the frontend
+        source: "/gateway/:path*",
+        // is proxied to the real Spring Cloud Gateway
+        destination: `${GATEWAY_BASE_URL}/:path*`,
       },
     ];
   },
 
 };
-
-// could've done this, but above is safer and more restrictive:
-// async rewrites() {
-//   return [
-//     {
-//       source: "/gateway/:path*",
-//       destination: `${GATEWAY_BASE_URL}/:path*`,
-//     },
-//   ];
-// }
 
 
 export default nextConfig;
