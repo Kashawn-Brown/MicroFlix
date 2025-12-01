@@ -1,4 +1,6 @@
 // Helps communicate safely with backend
+// All calls go through the Next.js server at /gateway/... and are then
+// proxied to the Spring Cloud Gateway by next.config.ts rewrites.
 
 
 // Describes a possible error response from backend
@@ -29,8 +31,9 @@ export class ApiError extends Error {
 }
 
 
+const GATEWAY_BASE_URL = process.env.GATEWAY_BASE_URL || "http://gateway:8081";
 // Use the URL from the env; otherwise, default to talk to backend running on localhost:8081
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081";
+const API_PREFIX = "/gateway";
 
 
 /**
@@ -45,8 +48,39 @@ export async function apiFetch<T>(
     options: RequestInit = {}
 ): Promise<T> {
 
-    // Automatically add the base URL then add sent in path
-    const url = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;   // unless whole path was sent in already (starts with http)
+    // Ensure the path we send to fetch starts with /gateway
+    const isAbsoluteUrl = /^https?:\/\//i.test(path);
+    const isServer = typeof window === "undefined";
+
+
+    // 1. Normalize the path to always start with '/'
+    let normalizedPath = isAbsoluteUrl
+    ? path
+    : path.startsWith("/")
+    ? path
+    : `/${path}`;
+
+    // 2. Ensure it starts with /gateway (for browser paths)
+    if (!isAbsoluteUrl && !normalizedPath.startsWith(API_PREFIX)) {
+        normalizedPath = `${API_PREFIX}${normalizedPath}`;
+    }
+
+    let url: string;
+
+    // 3. Decide the final URL based on where we are:
+    if (isAbsoluteUrl) {
+        // Already full URL, just use it
+        url = normalizedPath;
+    } 
+    else if (isServer) {
+        // On server: call gateway directly.
+        const backendPath = normalizedPath.replace(/^\/gateway/, "");
+        url = new URL(backendPath, GATEWAY_BASE_URL).toString();
+    } 
+    else {
+        // In browser: call /gateway/... on frontend, rewrites handle the rest
+        url = normalizedPath;
+    }
 
     // Calling fetch to make HTTP request
     const response = await fetch(url, {
