@@ -61,5 +61,4 @@ services:
     ports:
       - "80:3000"
     environment:
-      # Frontend talks to gateway *by container name* inside Docker
-      NEXT_PUBLIC_API_BASE_URL: http://gateway:8081
+      GATEWAY_BASE_URL: http://gateway:8081
