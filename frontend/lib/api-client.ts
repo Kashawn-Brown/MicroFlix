@@ -31,7 +31,6 @@ export class ApiError extends Error {
 }
 
 
-
 // For server-side fetches, we talk directly to the gateway URL.
 // In Docker on EC2: GATEWAY_BASE_URL=http://gateway:8081
 // In bare dev (npm run dev): GATEWAY_BASE_URL=http://localhost:8081
@@ -44,20 +43,34 @@ const GATEWAY_BASE_URL = process.env.GATEWAY_BASE_URL || "http://gateway:8081";
 const API_PREFIX = "/gateway";
 
 
-function buildUrl(path: string): string {
+function buildServerUrl(path: string): string {
   const isAbsolute = /^https?:\/\//i.test(path);
+  if (isAbsolute) return path;
 
-  if (isAbsolute) {
-    return path;
+  // Normalize
+  let p = path.startsWith("/") ? path : `/${path}`;
+
+  // If it already starts with /gateway, strip that before calling the real gateway
+  if (p.startsWith(API_PREFIX)) {
+    p = p.slice(API_PREFIX.length) || "/";
   }
 
-  if (path.startsWith("/gateway")) {
-    return path;
-  }
-
-  // Normal case: caller passes "/user-service/..." or "/movie-service/..."
-  return `${API_PREFIX}${path}`;
+  // http://gateway:8081 + /movie-service/...
+  return new URL(p, GATEWAY_BASE_URL).toString();
 }
+
+
+function buildBrowserUrl(path: string): string {
+  const isAbsolute = /^https?:\/\//i.test(path);
+  if (isAbsolute) return path;
+
+  let p = path.startsWith("/") ? path : `/${path}`;
+  if (!p.startsWith(API_PREFIX)) {
+    p = `${API_PREFIX}${p}`;
+  }
+  return p; // relative: /gateway/...
+}
+
 
 /**
  * Small wrapper around fetch for backend calls.
@@ -71,16 +84,15 @@ export async function apiFetch<T>(
     options: RequestInit = {}
 ): Promise<T> {
 
-    const url = buildUrl(path);
+    const isServer = typeof window === "undefined";
 
-    // Basic logging while we debug
-    if (typeof window === "undefined") {
+    const url = isServer ? buildServerUrl(path) : buildBrowserUrl(path);
+    
+    if (isServer) {
         console.log("apiFetch[server] ->", url);
-    } 
-    else {
+    } else {
         console.log("apiFetch[browser] ->", url);
     }
-
 
     // Calling fetch to make HTTP request
     const response = await fetch(url, {
