@@ -511,6 +511,46 @@ Other rating errors (like “rating not found” or invalid score) are handled b
 
 ---
 
+## Observability
+
+The rating-service exposes basic health information via Spring Boot Actuator.
+
+- **Health check**
+
+  - `GET /actuator/health`
+  - Returns `{ "status": "UP" }` when the service is healthy.
+
+> In production (AWS), this endpoint is only reachable from inside the Docker network:
+>
+> ```bash
+> curl http://rating-service:8084/actuator/health
+> ```
+
+## API Documentation (OpenAPI / Swagger)
+
+- **OpenAPI JSON**
+
+  - `GET /v3/api-docs`
+
+- **Swagger UI**
+
+  - `GET /swagger-ui/index.html`
+
+The docs cover rating + watchlist endpoints such as:
+
+- `PUT    /api/v1/ratings/movie/{movieId}` (rate a movie)
+- `GET    /api/v1/ratings/movie/{movieId}/summary`
+- `GET    /api/v1/ratings/me`
+- `DELETE /api/v1/ratings/movie/{movieId}`
+- `POST   /api/v1/engagements/watchlist/{movieId}`
+- `DELETE /api/v1/engagements/watchlist/{movieId}`
+- `GET    /api/v1/engagements/watchlist/me`
+
+Swagger UI is meant for internal debugging and contract inspection.
+
+
+---
+
 ## Future work
 
 Later improvements I plan to make:

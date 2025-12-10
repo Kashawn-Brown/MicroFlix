@@ -71,3 +71,21 @@ cd frontend
 npm install
 npm run dev
 ```
+
+## Observability & API Documentation
+
+Each core microservice (user-service, movie-service, rating-service) exposes:
+
+- **Health endpoint** via Spring Boot Actuator:
+
+  - `GET /actuator/health` → returns `{ "status": "UP" }` when the service is healthy.
+  - Used for Docker / future load balancers / uptime checks.
+  - In production, these endpoints are only reachable on the internal Docker network (EC2), not exposed publicly.
+
+- **OpenAPI / Swagger UI** via springdoc-openapi:
+
+  - `GET /v3/api-docs` → raw OpenAPI JSON
+  - `GET /swagger-ui/index.html` → interactive Swagger UI
+
+Swagger is primarily used during development and debugging to inspect and test endpoints.  
+Actuator health endpoints are the starting point for future monitoring and alerts (e.g., CloudWatch, Prometheus).

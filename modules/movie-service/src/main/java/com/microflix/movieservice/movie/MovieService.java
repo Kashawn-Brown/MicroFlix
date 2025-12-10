@@ -172,7 +172,7 @@ public class MovieService {         // Encapsulates business logic for movie ope
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
 
-        log.info("Movie: {} DTO Genres: {}, genreNames: {}", movie.getTitle(), movie.getMovieGenres(), genreNames);
+//        log.info("Movie: {} DTO Genres: {}, genreNames: {}", movie.getTitle(), movie.getMovieGenres(), genreNames);
         return new MovieResponse(
                 movie.getId(),
                 movie.getTitle(),
@@ -239,7 +239,7 @@ public class MovieService {         // Encapsulates business logic for movie ope
             case "year_asc" -> Sort.by(Sort.Direction.ASC, "releaseYear");
             case "year_desc" -> Sort.by(Sort.Direction.DESC, "releaseYear");
             case "created_desc" -> Sort.by(Sort.Direction.DESC, "createdAt");
-            default -> Sort.by(Sort.Direction.DESC, "createdAt"); // fallback
+            default -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")); // fallback
         };
     }
 

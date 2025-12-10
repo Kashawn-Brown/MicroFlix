@@ -241,6 +241,56 @@ As I add new behavior (for example, new profile fields or more detailed error ha
 
 ---
 
+## Observability
+
+The user-service exposes basic health information via Spring Boot Actuator.
+
+- **Health check**
+
+  - `GET /actuator/health`
+  - Returns a simple JSON status, e.g.:
+
+    ```json
+    { "status": "UP" }
+    ```
+
+  This endpoint is intended to be used by Docker, future load balancers, or simple uptime checks to verify that the service is running.
+
+> In production (AWS), this endpoint is available on the internal Docker network only. To check it manually you can SSH into the EC2 instance and run:
+>
+> ```bash
+> curl http://user-service:8082/actuator/health
+> ```
+
+(We deliberately do **not** expose Actuator endpoints publicly to the internet.)
+
+## API Documentation (OpenAPI / Swagger)
+
+The user-service exposes its HTTP API contract via Springdoc OpenAPI.
+
+- **OpenAPI JSON**
+
+  - `GET /v3/api-docs`
+
+- **Swagger UI**
+
+  - `GET /swagger-ui/index.html`
+
+These docs are generated automatically from the `@RestController` classes and DTOs.  
+They list endpoints such as:
+
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `GET  /api/v1/users/me`
+- `PATCH /api/v1/users/me`
+- `PATCH /api/v1/users/me/password`
+- `GET  /api/v1/users/health`
+- `GET  /api/v1/admin/ping`
+
+> In production, Swagger UI is primarily for internal use (e.g., via SSH tunnel or internal tools) and should not be exposed to the open internet.
+
+---
+
 ## Error handling
 
 * Invalid credentials:
