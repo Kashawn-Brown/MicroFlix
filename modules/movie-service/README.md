@@ -364,6 +364,42 @@ As I expand movie-service (search, filtering, syncing more fields from TMDb), Iâ
 
 ---
 
+## Observability
+
+The movie-service exposes basic health information via Spring Boot Actuator.
+
+- **Health check**
+
+  - `GET /actuator/health`
+  - Returns `{ "status": "UP" }` when the service is healthy.
+
+> In production (AWS), this endpoint is only reachable on the internal Docker network.  
+> Example from the EC2 instance:
+>
+> ```bash
+> curl http://movie-service:8083/actuator/health
+> ```
+
+## API Documentation (OpenAPI / Swagger)
+
+- **OpenAPI JSON**
+
+  - `GET /v3/api-docs`
+
+- **Swagger UI**
+
+  - `GET /swagger-ui/index.html`
+
+These docs describe the movie catalog endpoints used by the frontend, such as:
+
+- `GET /api/v1/movies` (search + pagination)
+- `GET /api/v1/movies/{id}` (details)
+- `GET /api/v1/movies/genres` (genre list)
+
+Swagger UI is for internal inspection/debugging and should not be exposed publicly.
+
+---
+
 ## Error handling
 
 * Missing movies:
