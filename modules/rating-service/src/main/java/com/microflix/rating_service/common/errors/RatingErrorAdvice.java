@@ -15,30 +15,48 @@ public class RatingErrorAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(RatingErrorAdvice.class);
 
-    // Return 404 with a ProblemDetail body when a rating is not found.
+    /**
+     * 404 when a rating cannot be found.
+     */
     @ExceptionHandler(RatingNotFoundException.class)
     public ProblemDetail handleRatingNotFound(RatingNotFoundException ex) {
         log.info("Rating not found: {}", ex.getMessage());
 
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+        var pd = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND,
                 ex.getMessage()
         );
-        problem.setTitle("Rating not found");
-        return problem;
+        pd.setTitle("Rating not found");
+        return pd;
     }
 
-    // Return 400 when input data (e.g. rating value) is invalid.
+
+    /**
+     * 400 when input data (e.g. rating value) is invalid.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
-        log.info("Invalid input data: {}", ex.getMessage());
+        log.info("Invalid rating request: {}", ex.getMessage());
 
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+        var pd = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST,
                 ex.getMessage()
         );
-        problem.setTitle("Invalid rating request");
-        return problem;
+        pd.setTitle("Invalid rating request");
+        return pd;
+    }
+
+    /**
+     * 500 fallback for any unexpected errors in rating-service.
+     */
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail fallback(Exception ex) {
+        log.error("Unhandled rating-service error", ex);
+
+        var pd = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+        pd.setTitle("Internal Error");
+        pd.setDetail("Something went wrong in rating-service.");
+        return pd;
     }
 
 }
