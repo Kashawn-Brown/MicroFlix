@@ -1,6 +1,8 @@
 package com.microflix.userservice.common.errors;
 
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.FieldError;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @RestControllerAdvice
 public class ErrorAdvice {
+
+    private static final Logger log = LoggerFactory.getLogger(ErrorAdvice.class);
 
     // 400 for IllegalArgumentException (bad input).
     @ExceptionHandler(IllegalArgumentException.class)

@@ -17,18 +17,48 @@ public class MovieErrorAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(MovieErrorAdvice.class);
 
-    // Handles "movie not found" errors as HTTP 404 with a ProblemDetail body.
+    /**
+     * 404 when a movie cannot be found.
+     */
     @ExceptionHandler(MovieNotFoundException.class)
     ProblemDetail handleMovieNotFound(MovieNotFoundException ex) {
 
         log.info("Movie not found: {}", ex.getMessage());
 
-        var problem = ProblemDetail.forStatusAndDetail(
+        var pd = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND,
                 ex.getMessage()
         );
-        problem.setTitle("Movie not found");
+        pd.setTitle("Movie not found");
 
-        return problem;
+        return pd;
+    }
+
+    /**
+     * 400 for bad arguments (e.g. invalid query params).
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
+        log.info("Invalid movie request: {}", ex.getMessage());
+
+        var pd = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST,
+                ex.getMessage()
+        );
+        pd.setTitle("Invalid movie request");
+        return pd;
+    }
+
+    /**
+     * 500 safety net for any unexpected errors.
+     */
+    @ExceptionHandler(Exception.class)
+    ProblemDetail fallback(Exception ex) {
+        log.error("Unhandled movie-service error", ex);
+
+        var pd = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+        pd.setTitle("Internal Error");
+        pd.setDetail("Something went wrong in movie-service.");
+        return pd;
     }
 }
