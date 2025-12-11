@@ -1,9 +1,12 @@
-package com.microflix.movieservice.tmdb.dto;
+/// REDUNDANT
+/// NOW REPLACED WITH PROPER INGESTION SERVICE
 
-import java.util.List;
-
-// Represents the whole response from TMDb movie lists (results -> list of movies)
-public record TmdbMovieListResponse(
-        int page,
-        List<TmdbMovieResult> results
-        ) {}
+//package com.microflix.movieservice.tmdb.dto;
+//
+//import java.util.List;
+//
+//// Represents the whole response from TMDb movie lists (results -> list of movies)
+//public record TmdbMovieListResponse(
+//        int page,
+//        List<TmdbMovieResult> results
+//        ) {}

@@ -26,6 +26,7 @@
         <module>modules/user-service</module>
         <module>modules/movie-service</module>
         <module>modules/rating-service</module>
+        <module>modules/tmdb-ingestion-service</module>
     </modules>
 
     <dependencyManagement>

@@ -5,6 +5,7 @@
     <file url="file://$PROJECT_DIR$/modules/gateway/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/movie-service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/rating-service/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/modules/tmdb-ingestion-service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/user-service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />

@@ -7,7 +7,6 @@ import com.microflix.movieservice.genre.MovieGenre;
 import com.microflix.movieservice.movie.dto.CreateMovieRequest;
 import com.microflix.movieservice.movie.dto.GenreResponse;
 import com.microflix.movieservice.movie.dto.MovieResponse;
-import com.microflix.movieservice.tmdb.MovieSeeder;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.slf4j.Logger;

@@ -99,6 +99,20 @@ services:
       - "8083:8083"                     # host:container
 
 
+  tmdb-ingestion-service:
+    profiles:
+      - jobs
+    build:
+      context: ..
+      dockerfile: modules/tmdb-ingestion-service/Dockerfile
+    environment:
+      TMDB_API_KEY: ${TMDB_API_KEY}
+      MOVIE_SERVICE_BASE_URL: http://movie-service:8083
+    depends_on:
+      - movie-service
+    restart: no
+    # no ports needed; this is a job, not an API
+
   rating-db:                        # Rating Database Service (Container)
     image: postgres:18
     container_name: pg-rating
