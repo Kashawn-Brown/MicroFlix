@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: tmdb-ingestion-service
+  main:
+    web-application-type: none
+
+tmdb:
+  base-url: https://api.themoviedb.org/3
+  api-key: ${TMDB_API_KEY}   # set via environment variable
+
+movie-service:
+  # local dev
+  base-url: http://localhost:8083     # In docker: http://movie-service:8083
+
+ingestion:
+  default-count: 50   # fallback if '--count=NN' not passed on the command line
+  max-pages: 50

@@ -2,7 +2,7 @@
 
 MicroFlix is a microservices-based movie platform I’m building to practice **production-minded backend development** and full-stack integration.
 
-The system is split into small Spring Boot services (users, movies, ratings) behind a Spring Cloud Gateway, with a Next.js frontend on top and a Docker / AWS EC2 deployment that feels close to a real-world setup. :contentReference[oaicite:0]{index=0}
+The system is split into small Spring Boot services (users, movies, ratings) behind a Spring Cloud Gateway, with a Next.js frontend on top and a Docker / AWS EC2 deployment that feels close to a real-world setup.
 
 ---
 
@@ -15,6 +15,9 @@ The system is split into small Spring Boot services (users, movies, ratings) beh
 
 - `modules/movie-service`  
   Movie metadata (title, overview, year, genres, poster/backdrop) with search/filter/sort + pagination and TMDb-based seeding.
+
+- `modules/tmdb-ingestion-service`  
+  One-shot Spring Boot batch job that pulls movies from TMDb and seeds them into `movie-service` over internal HTTP. It’s run on demand via Docker/Compose, then exits when done.
 
 - `modules/rating-service`  
   Movie ratings (1–10 scale with 0.1 increments, stored as `rating_times_ten`) plus a watchlist feature via a generic `engagements` table.
@@ -73,6 +76,35 @@ This brings up:
 * `frontend` on **[http://localhost:80](http://localhost:80)** (or `http://localhost:3000` in dev-only setups)
 
 The frontend talks only to the **gateway**, not directly to the microservices.
+
+### TMDb ingestion job (seeding movies)
+
+The TMDb ingestion service is a **one-off job**, not a long-running API.  
+First, make sure the main stack is running:
+
+```bash
+cd docker
+docker compose up --build
+````
+
+Then, from the same `docker` folder, run the ingestion job with a target number of movies to insert:
+
+```bash
+docker compose --profile jobs run --rm tmdb-ingestion-service --count=50
+```
+
+* `--count=50` tells the job to try to insert up to 50 new movies (skipping any TMDb IDs that already exist in the database).
+* If you omit `--count=...`, it falls back to the default defined in `tmdb-ingestion-service`’s `application.yml` (`ingestion.default-count`).
+* The job logs each TMDb list it processes and then exits when it hits the target, runs out of new movies, or reaches the max configured page limit.
+
+> **Note:** After changing code in `tmdb-ingestion-service`, run:
+>
+> ```bash
+> cd docker
+> docker compose build tmdb-ingestion-service
+> ```
+>
+> before calling `docker compose --profile jobs run ...`, otherwise Docker will reuse the old image.
 
 ### Frontend in dev mode (optional)
 
@@ -181,6 +213,34 @@ MicroFlix is deployed to an **AWS EC2** instance running Docker and Docker Compo
 
   * only the **frontend (port 80)** is exposed publicly;
   * microservices and databases stay on the internal Docker network.
+
+### Running the TMDb ingestion job in production
+
+On EC2, the ingestion job is also run as a one-off container.  
+From the `docker` directory on the EC2 instance:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile jobs run --rm tmdb-ingestion-service --count=50
+````
+
+This reuses the existing production stack configuration (`docker-compose.yml` + `docker-compose.prod.yml`), starts the job container with access to `movie-service` and the movie database, inserts new TMDb movies, and then exits. You can trigger this manually or later wire it into a cron job or scheduled GitHub Action.
+
+> **Note:** After changing `tmdb-ingestion-service` code and deploying to EC2, rebuild
+> the ingestion image before running the job:
+>
+> ```bash
+> docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
+>   --profile jobs build tmdb-ingestion-service
+> ```
+>
+> Then run:
+>
+> ```bash
+> docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
+>   --profile jobs run --rm tmdb-ingestion-service --count=50
+> ```
+> 
 
 ### GitHub Actions
 

@@ -32,11 +32,20 @@ management:
         include: health,info,metrics
 
 
-tmdb:
-  base-url: https://api.themoviedb.org/3
-  # api-key will come from environment (TMDB_API_KEY)
 
-movie:
-  tmdb:
-    seed:
-      enabled: false   # default: do NOT seed
+
+
+
+
+
+#  /// REDUNDANT
+#  /// NOW REPLACED WITH PROPER INGESTION SERVICE
+
+#tmdb:
+#  base-url: https://api.themoviedb.org/3
+#  # api-key will come from environment (TMDB_API_KEY)
+#
+#movie:
+#  tmdb:
+#    seed:
+#      enabled: false   # default: do NOT seed
