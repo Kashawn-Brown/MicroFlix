@@ -8,19 +8,19 @@ Unlike the other Spring Boot apps, this service does **not** expose an HTTP API.
 
 ## Responsibilities
 
-- Call TMDb list endpoints (e.g. **popular**, **top rated**, **now playing**, **upcoming**, plus a `/discover`-based feed).
+- Call TMDb list endpoints (popular, top rated, now playing, upcoming, plus a `/discover`-based feed).
 - Map TMDb results into the same `CreateMovieRequest` DTO used by `movie-service`.
 - Deduplicate by TMDb id:
   - Skip movies with missing `tmdbId`.
-  - Call `movie-service`’s internal endpoint `GET /api/internal/v1/movies/exists-by-tmdb/{tmdbId}` to avoid inserting duplicates.
+  - Call `movie-service`’s internal `GET /api/internal/v1/movies/exists-by-tmdb/{tmdbId}` to avoid inserting duplicates.
 - Insert new movies via `POST /api/v1/movies` on `movie-service`.
-- Respect a **target count** of movies to insert:
-  - Default comes from configuration (`ingestion.default-count`).
-  - Can be overridden with a command-line flag: `--count=NN`.
-- Paginate through TMDb pages (with a configurable max page limit) and stop when:
-  - The target count has been reached, or
-  - A page yields no new movies, or
-  - The configured maximum page limit is hit.
+- **Optionally enrich movies after seeding**:
+  - For movies created in this run (`--enrich`), fetch TMDb detail and PATCH fields like `runtime`.
+  - For existing movies missing runtime (`--enrich-runtime`), fetch candidates from `movie-service` and backfill their runtime.
+- Respect a target count and pagination limits so the job:
+  - Stops when the target count is reached,
+  - Or when a page yields no new movies,
+  - Or when the configured maximum TMDb page limit is hit.
 
 This keeps the ingestion job **idempotent** and safe to re-run without duplicating data in the movie catalog.
 
@@ -58,8 +58,11 @@ Environment:
 
 The ingestion service uses this base URL to call:
 
-* `GET /api/internal/v1/movies/exists-by-tmdb/{tmdbId}` – internal existence check.
-* `POST /api/v1/movies` – create movie in the catalog.
+- `GET /api/internal/v1/movies/exists-by-tmdb/{tmdbId}` – internal existence check used during seeding.
+- `POST /api/v1/movies` – create movie in the catalog.
+- `GET /api/internal/v1/movies/needs-runtime` – fetch movies that have a `tmdbId` but no `runtime` yet (runtime backfill mode).
+- `PATCH /api/internal/v1/movies/{id}` – partial update by internal id (used for generic backfill).
+- `PATCH /api/internal/v1/movies/by-tmdb/{tmdbId}` – partial update by TMDb id (used when enriching movies created in this run).
 
 ### Ingestion tuning
 
@@ -87,13 +90,18 @@ From the repo root:
 
 ```bash
 cd modules/tmdb-ingestion-service
+
+# Seed up to 50 new movies
 mvn spring-boot:run -Dspring-boot.run.arguments="--count=50"
-```
 
-Or, to use the configured default count:
-
-```bash
+# Use default ingestion.default-count from application.yml
 mvn spring-boot:run
+
+# Seed and then enrich only the movies created in this run
+mvn spring-boot:run -Dspring-boot.run.arguments="--count=50 --enrich"
+
+# Backfill runtimes for existing movies that are missing runtime
+mvn spring-boot:run -Dspring-boot.run.arguments="--enrich-runtime --update-limit=200"
 ```
 
 Make sure `movie-service` is running on `http://localhost:8083` and `TMDB_API_KEY` is set in your environment.
@@ -119,8 +127,18 @@ To run the ingestion job as a one-off container (using the `jobs` profile):
 cd docker
 docker compose --profile jobs run --rm tmdb-ingestion-service --count=50
 ```
+To seed and then enrich only the movies created in this run:
 
-* `--count=50` → insert up to ~50 new movies (or fewer if there aren’t enough unique ones).
+```bash
+docker compose --profile jobs run --rm tmdb-ingestion-service --count=50 --enrich
+````
+
+To backfill runtime for existing movies that are missing it:
+
+```bash
+docker compose --profile jobs run --rm tmdb-ingestion-service --enrich-runtime --update-limit=200
+```
+
 * Omitting `--count` makes it fall back to `ingestion.default-count` from `application.yml`.
 
 The service picks up `TMDB_API_KEY` and `MOVIE_SERVICE_BASE_URL` from `.env` just like the other services.
@@ -163,6 +181,20 @@ The ingestion service is present in the compose file but **only runs when explic
 ```bash
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
   --profile jobs run --rm tmdb-ingestion-service --count=50
+```
+
+To seed and enrich newly created movies in one run:
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile jobs run --rm tmdb-ingestion-service --count=50 --enrich
+````
+
+To backfill runtime for older movies:
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile jobs run --rm tmdb-ingestion-service --enrich-runtime --update-limit=200
 ```
 
 This command can later be wired into a **cron job**, a scheduled GitHub Action, or a manual run whenever you want to top up the catalog with more TMDb movies.
