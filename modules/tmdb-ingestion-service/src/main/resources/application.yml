@@ -15,3 +15,8 @@ movie-service:
 ingestion:
   default-count: 50   # fallback if '--count=NN' not passed on the command line
   max-pages: 50
+
+# To see debug logs (off for now)
+#logging:
+#  level:
+#    com.microflix.tmdb_ingestion_service: DEBUG

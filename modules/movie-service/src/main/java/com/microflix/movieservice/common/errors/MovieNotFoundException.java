@@ -8,4 +8,10 @@ public class MovieNotFoundException extends RuntimeException {
     public MovieNotFoundException(Long id) {
         super("No movie with the id " + id + " found");
     }
+
+    public MovieNotFoundException(String message) {
+        super(message);
+    }
+
+
 }

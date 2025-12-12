@@ -1,5 +1,6 @@
 package com.microflix.tmdb_ingestion_service.tmdb;
 
+import com.microflix.tmdb_ingestion_service.movie.dto.TmdbMovieDetailResponse;
 import com.microflix.tmdb_ingestion_service.tmdb.dto.TmdbMovieListResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,5 +125,20 @@ public class TmdbClient {
     }
 
 
+    /**
+     * Fetch a single movie's detailed info from TMDb by its tmdbId.
+     */
+    public TmdbMovieDetailResponse fetchMovieDetail(Long tmdbId) {
+        log.info("Fetching TMDb movie details for tmdbId={}", tmdbId);
+
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/movie/{id}")
+                        .queryParam("api_key", apiKey)
+                        .build(tmdbId)
+                )
+                .retrieve()
+                .body(TmdbMovieDetailResponse.class);
+    }
 
 }

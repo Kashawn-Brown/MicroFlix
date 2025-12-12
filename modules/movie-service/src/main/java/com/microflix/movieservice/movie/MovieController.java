@@ -3,6 +3,7 @@ package com.microflix.movieservice.movie;
 import com.microflix.movieservice.movie.dto.CreateMovieRequest;
 import com.microflix.movieservice.movie.dto.GenreResponse;
 import com.microflix.movieservice.movie.dto.MovieResponse;
+import com.microflix.movieservice.movie.dto.UpdateMovieRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +45,8 @@ public class MovieController {
 
     /**
      * Creates a new movie and returns it with HTTP 201.
+     *
+     * Now implemented in Internal Controller (only to be used by Tmdb ingestion service)
      */
     @PostMapping
     public ResponseEntity<MovieResponse> createMovie(@RequestBody CreateMovieRequest request) {
@@ -52,6 +55,19 @@ public class MovieController {
         var response = movieService.createMovie(request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Partially updates a single movie by its id.
+     *
+     * Now implemented in Internal Controller (only to be used by Tmdb ingestion service)
+     */
+    @PatchMapping("/{id}")
+    public ResponseEntity<MovieResponse> updateMovie(@PathVariable Long id, @RequestBody UpdateMovieRequest request) {
+
+        var response = movieService.updateMovie(id, request);
+
+        return ResponseEntity.ok(response);
     }
 
     /**

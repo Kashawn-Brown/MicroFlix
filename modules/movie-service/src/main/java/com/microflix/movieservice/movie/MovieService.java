@@ -4,15 +4,14 @@ import com.microflix.movieservice.common.errors.MovieNotFoundException;
 import com.microflix.movieservice.genre.Genre;
 import com.microflix.movieservice.genre.GenreRepository;
 import com.microflix.movieservice.genre.MovieGenre;
-import com.microflix.movieservice.movie.dto.CreateMovieRequest;
-import com.microflix.movieservice.movie.dto.GenreResponse;
-import com.microflix.movieservice.movie.dto.MovieResponse;
+import com.microflix.movieservice.movie.dto.*;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -73,6 +72,68 @@ public class MovieService {         // Encapsulates business logic for movie ope
         var newMovie = movieRepository.save(movie);
 
         return toMovieResponse(newMovie);
+    }
+    /**
+     * Updates a movie referenced by its id using the request DTO and returns the saved movie.
+     */
+    public MovieResponse updateMovie(Long id, UpdateMovieRequest request) {
+        Movie movie = movieRepository.findById(id)
+                .orElseThrow(() -> new MovieNotFoundException(id));
+
+        // Only apply non-null fields (partial update)
+        if (request.runtime() != null) {
+            movie.setRuntime(request.runtime());
+        }
+        if (request.overview() != null) {
+            movie.setOverview(request.overview());
+        }
+        if (request.posterUrl() != null) {
+            movie.setPosterUrl(request.posterUrl());
+        }
+        if (request.backdropUrl() != null) {
+            movie.setBackdropUrl(request.backdropUrl());
+        }
+
+        // movie is managed; changes will be flushed on commit
+        return toMovieResponse(movie);
+    }
+
+    /**
+     * Updates a movie referenced by its Tmdb id using the request DTO and returns the saved movie.
+     */
+    public MovieResponse updateMovieTmdb(Long tmdbId, UpdateMovieRequest request) {
+        Movie movie = movieRepository.findByTmdbId(tmdbId)
+                .orElseThrow(() -> new MovieNotFoundException("No movie with the Tmdb id " + tmdbId + " found"));
+
+        // Only apply non-null fields (partial update)
+        if (request.runtime() != null) {
+            movie.setRuntime(request.runtime());
+        }
+        if (request.overview() != null) {
+            movie.setOverview(request.overview());
+        }
+        if (request.posterUrl() != null) {
+            movie.setPosterUrl(request.posterUrl());
+        }
+        if (request.backdropUrl() != null) {
+            movie.setBackdropUrl(request.backdropUrl());
+        }
+
+        // movie is managed; changes will be flushed on commit
+        return toMovieResponse(movie);
+    }
+
+    /**
+     * Returns a page of movies that still need their runtime set from TMDb.
+     */
+    public Page<MovieSummaryResponse> findMoviesNeedingRuntime(Pageable pageable) {
+        Page<Movie> page = movieRepository.findByRuntimeIsNullAndTmdbIdIsNotNull(pageable);
+
+        return page.map(movie -> new MovieSummaryResponse(
+                movie.getId(),
+                movie.getTmdbId(),
+                movie.getTitle()
+        ));
     }
 
     /**
