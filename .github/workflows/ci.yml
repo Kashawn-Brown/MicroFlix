@@ -21,7 +21,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      # Remember all the jars we downloaded last time so we don’t have to download them again, unless our project’s POMs changed
+      # All the jars we downloaded last time... we don’t have to download them again, unless our project’s POMs changed
       # Don't need to re-download all dependencies every run
       - name: Cache Maven repo
         uses: actions/cache@v4
@@ -60,3 +60,55 @@ jobs:
       - name: Run frontend build
         working-directory: frontend
         run: npm run build
+
+  docker-images:
+    name: Build & push Docker images
+    runs-on: ubuntu-latest
+
+    # only run this when pushing to main (skip on PRs)
+    if: github.ref == 'refs/heads/main'
+
+    needs:
+      - backend
+      - frontend
+
+    # overriding tag
+    env:
+      IMAGE_TAG: latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build images with docker compose
+        working-directory: docker
+        run: |
+          IMAGE_TAG=${IMAGE_TAG} docker compose build \
+            discovery \
+            gateway \
+            user-service \
+            movie-service \
+            rating-service \
+            tmdb-ingestion-service \
+            frontend
+
+      - name: Push images with docker compose
+        working-directory: docker
+        run: |
+          IMAGE_TAG=${IMAGE_TAG} docker compose push \
+            discovery \
+            gateway \
+            user-service \
+            movie-service \
+            rating-service \
+            tmdb-ingestion-service \
+            frontend

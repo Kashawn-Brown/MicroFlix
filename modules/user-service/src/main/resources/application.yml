@@ -26,9 +26,10 @@ eureka:
 
 app:
   jwt:
-    secret: "secret-secret-secret-key"                # simple dev secret; rotate in prod
-    issuer: "microflix-user-service"
-    ttl-minutes: 60
+    secret: ${JWT_SECRET_KEY:secret-secret-local-key}
+    issuer: ${JWT_ISSUER:microflix-user-service}
+    # time-to-live -> minutes until JWT is no longer valid
+    ttl-minutes: ${TTL_MINUTES:60}
 
 management:
   endpoints:
