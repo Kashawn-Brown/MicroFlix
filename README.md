@@ -269,6 +269,41 @@ Branch protection rules require the CI checks to pass before merging into `main`
 
 ---
 
+### GitHub Actions
+
+Two main workflows keep MicroFlix healthy and deployed:
+
+* **CI** (`.github/workflows/ci.yml`)
+
+  * Runs on pushes and pull requests.
+  * Always:
+    * Builds and tests the backend (`mvn -B clean test` from the repo root).
+    * Builds the frontend (`npm ci && npm run build` in `frontend/`).
+  * On pushes to `main`:
+    * Also builds Docker images for all services (discovery, gateway, user-service, movie-service, rating-service, tmdb-ingestion, frontend).
+    * Pushes them to Docker Hub under `kbrown2428/microflix-*` tagged `:latest`.
+
+* **Deploy to EC2** (`.github/workflows/cd.yml`)
+
+  * Triggered automatically via `workflow_run` **after the CI workflow completes successfully on `main`**, and can also be started manually with `workflow_dispatch`.
+  * SSHes into the EC2 instance using GitHub secrets (`EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`).
+  * On the server it:
+    * Prunes old unused Docker artifacts (safe-ish cleanup).
+    * Pulls the latest code (`git fetch` + `git reset --hard origin/main`).
+    * Pulls the newest container images and restarts the stack:
+
+      ```bash
+      cd /opt/MicroFlix/docker
+      IMAGE_TAG=latest docker-compose pull
+      IMAGE_TAG=latest docker-compose up -d
+      ```
+
+    * EC2 never builds images; it only pulls and runs the ones built by CI.
+
+Branch protection rules require the CI checks to pass before merging into `main`, and the deploy workflow only runs after a successful CI run, so only healthy builds are deployed.
+
+---
+
 ## Where to look next
 
 * `modules/user-service/README.md` – auth, profile, and error handling.
