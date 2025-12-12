@@ -17,7 +17,7 @@ The system is split into small Spring Boot services (users, movies, ratings) beh
   Movie metadata (title, overview, year, genres, poster/backdrop) with search/filter/sort + pagination and TMDb-based seeding.
 
 - `modules/tmdb-ingestion-service`  
-  One-shot Spring Boot batch job that pulls movies from TMDb and seeds them into `movie-service` over internal HTTP. It’s run on demand via Docker/Compose, then exits when done.
+  One-shot Spring Boot job that seeds movies from TMDb into `movie-service` and can enrich them (e.g. runtime) via internal APIs.
 
 - `modules/rating-service`  
   Movie ratings (1–10 scale with 0.1 increments, stored as `rating_times_ten`) plus a watchlist feature via a generic `engagements` table.
@@ -77,30 +77,33 @@ This brings up:
 
 The frontend talks only to the **gateway**, not directly to the microservices.
 
-### TMDb ingestion job (seeding movies)
+### TMDb ingestion jobs (manual)
+The TMDb ingestion service is a **one-off job**, not a long-running API.
 
-The TMDb ingestion service is a **one-off job**, not a long-running API.  
-First, make sure the main stack is running:
+You run it when you want to add or enrich movies.
+
+From `docker/`:
 
 ```bash
-cd docker
+# Make sure the main stack is running
 docker compose up --build
+
+# Seed up to 50 new movies from TMDb into movie-service
+docker compose --profile jobs run --rm tmdb-ingestion-service --count=50
+
+# Seed and then immediately enrich the movies created in this run (e.g. runtime)
+docker compose --profile jobs run --rm tmdb-ingestion-service --count=50 --enrich
+
+# Backfill runtimes for any existing movies missing runtime (generic enrichment)
+docker compose --profile jobs run --rm tmdb-ingestion-service --enrich-runtime --update-limit=200
 ````
 
-Then, from the same `docker` folder, run the ingestion job with a target number of movies to insert:
-
-```bash
-docker compose --profile jobs run --rm tmdb-ingestion-service --count=50
-```
-
-* `--count=50` tells the job to try to insert up to 50 new movies (skipping any TMDb IDs that already exist in the database).
-* If you omit `--count=...`, it falls back to the default defined in `tmdb-ingestion-service`’s `application.yml` (`ingestion.default-count`).
-* The job logs each TMDb list it processes and then exits when it hits the target, runs out of new movies, or reaches the max configured page limit.
+The `--count` flag controls how many new movies to insert (0 or missing means “use default” from config).
+The `--update-limit` flag controls how many movies to update in backfill mode.
 
 > **Note:** After changing code in `tmdb-ingestion-service`, run:
 >
 > ```bash
-> cd docker
 > docker compose build tmdb-ingestion-service
 > ```
 >
@@ -270,7 +273,9 @@ Branch protection rules require the CI checks to pass before merging into `main`
 
 * `modules/user-service/README.md` – auth, profile, and error handling.
 * `modules/movie-service/README.md` – search, genres, TMDb seeding, and indexing.
+* `modules/tmdb-ingestion-service/README.md` – TMDb seeding + enrichment job and how to run it.
 * `modules/rating-service/README.md` – ratings, watchlist, and engagement model.
 * `modules/gateway/README.md` – routes and aggregated catalog endpoints.
 * `frontend/README.md` – Next.js UI and how it talks to the gateway.
 
+---

@@ -51,17 +51,37 @@ Responses are mapped to DTOs (e.g., `MovieResponse`) and include genres and post
 Movie search was benchmarked under load with tools like `autocannon`, and these indexes were validated using `EXPLAIN ANALYZE` to keep high-percentile latency stable while increasing throughput.
 
 ---
+## TMDb integration
 
-## TMDb seeding
+Movie data is now seeded and enriched by the separate **tmdb-ingestion-service**.
 
-A dedicated seeding component uses a `TmdbClient` to:
+`movie-service` itself:
 
-- Fetch movie lists from TMDb
-- Map remote genres to local `Genre` rows
-- Persist movies, genres, and `movie_genres` join rows
-- Store only TMDb image paths (poster/backdrop); the frontend assembles full URLs
+- Stores the TMDb id (`tmdbId`) for each movie.
+- Exposes internal endpoints that the ingestion job calls to:
+  - Check if a movie already exists by `tmdbId`.
+  - Create new movies.
+  - Find movies that still need enrichment (e.g. missing runtime).
+  - Apply partial updates (PATCH) to add runtime and, later, other fields.
 
-Seeding can be enabled/disabled via configuration (e.g., profile or property flag).
+All TMDb communication (popular/top rated/now playing/upcoming/discover lists and individual movie detail calls) happens inside `tmdb-ingestion-service`.
+
+## Internal integration endpoints
+
+These endpoints are not exposed through the gateway; they are used by internal jobs like `tmdb-ingestion-service`:
+
+- `GET /api/internal/v1/movies/exists-by-tmdb/{tmdbId}`  
+  Returns whether a movie with this TMDb id already exists (used for idempotent seeding).
+
+- `GET /api/internal/v1/movies/needs-runtime`  
+  Returns movies that have a `tmdbId` but no `runtime` yet.  
+  Supports `page` and `size` query parameters for simple pagination.
+
+- `PATCH /api/internal/v1/movies/{id}`  
+  Partially updates a movie by its internal id using `UpdateMovieRequest`. Only non-null fields are applied.
+
+- `PATCH /api/internal/v1/movies/by-tmdb/{tmdbId}`  
+  Partially updates a movie by its TMDb id. Used when enriching movies that were just seeded.
 
 ---
 
@@ -115,3 +135,4 @@ Locally: `http://localhost:8083/swagger-ui/index.html`
 In production: available on the internal network for debugging and documentation.
 
 ---
+
