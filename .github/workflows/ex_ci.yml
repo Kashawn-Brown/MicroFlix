@@ -1,0 +1,43 @@
+ name: CI
+
+ on:
+   push:
+     branches: [ main ]
+   pull_request:
+     branches: [ main ]
+    
+                      jobs:
+   backend:
+     # ... your current backend CI job ...
+
+   frontend:
+     # ... your current frontend CI job ...
+
+   build-and-push-images:
+     needs: [backend, frontend]
+     runs-on: ubuntu-latest
+     if: github.ref == 'refs/heads/main'   # only build images on main
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v4
+
+       - name: Set up Docker Buildx
+         uses: docker/setup-buildx-action@v3
+
+       - name: Log in to Docker Hub
+         uses: docker/login-action@v3
+         with:
+           username: ${{ secrets.DOCKERHUB_USERNAME }}
+           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+       - name: Build and push gateway image
+         uses: docker/build-push-action@v5
+         with:
+           context: .
+           file: docker/gateway/Dockerfile    # adjust path to your actual Dockerfile
+           push: true
+           tags: |
+             kashawn/microflix-gateway:latest
+             kashawn/microflix-gateway:${{ github.sha }}
+
+       # repeat for discovery, user-service, movie-service, rating-service, frontend

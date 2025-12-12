@@ -4,19 +4,21 @@ services:
     build:
       context: ..
       dockerfile: modules/discovery/Dockerfile
+    image: kbrown2428/microflix-discovery:${IMAGE_TAG}
     container_name: discovery
     ports:
       - "8761:8761"
     environment:
       # Standalone Eureka server – no need to register with other peers
-      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
-      - EUREKA_CLIENT_FETCH_REGISTRY=false
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: false
+      EUREKA_CLIENT_FETCH_REGISTRY: false
 
 
   gateway:              # Gateway
     build:
       context: ..
       dockerfile: modules/gateway/Dockerfile
+    image: kbrown2428/microflix-gateway:${IMAGE_TAG}
     container_name: gateway
     depends_on:
       - discovery
@@ -24,7 +26,7 @@ services:
       - movie-service
       - rating-service
     environment:    # Set env variables for service
-      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/          # Route resolution via Eureka:
+      EUREKA_DEFAULT_ZONE: http://discovery:8761/eureka/          # Route resolution via Eureka:
     ports:
       - "8081:8081"
 
@@ -47,17 +49,22 @@ services:
     build:
       context: ..                       # repo root (one level up from docker/)
       dockerfile: modules/user-service/Dockerfile               # path from repo root to the Dockerfile
+    image: kbrown2428/microflix-user-service:${IMAGE_TAG}
     container_name: user-service
     restart: unless-stopped
     depends_on:
       - user-db
       - discovery
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/userdb
-      - SPRING_DATASOURCE_USERNAME=user
-      - SPRING_DATASOURCE_PASSWORD=user
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ISSUER: ${JWT_ISSUER}
+      TTL_MINUTES: ${TTL_MINUTES}
 
-      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/      # Eureka client: point to discovery server in Docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://user-db:5432/userdb
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: user
+
+      EUREKA_DEFAULT_ZONE: http://discovery:8761/eureka/      # Eureka client: point to discovery server in Docker
     ports:
       - "8082:8082"                     # host:container
 
@@ -80,38 +87,21 @@ services:
     build:
       context: ..                       # repo root (one level up from docker/)
       dockerfile: modules/movie-service/Dockerfile               # path from repo root to the Dockerfile
+    image: kbrown2428/microflix-movie-service:${IMAGE_TAG}
     container_name: movie-service
     restart: unless-stopped
     depends_on:
       - movie-db
       - discovery
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://movie-db:5432/moviedb
-      - SPRING_DATASOURCE_USERNAME=movie
-      - SPRING_DATASOURCE_PASSWORD=movie
+      SPRING_DATASOURCE_URL: jdbc:postgresql://movie-db:5432/moviedb
+      SPRING_DATASOURCE_USERNAME: movie
+      SPRING_DATASOURCE_PASSWORD: movie
 
-      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/      # Eureka config: point to discovery server in Docker
-
-      - TMDB_BASE_URL=https://api.themoviedb.org/3
-      - TMDB_API_KEY=${TMDB_API_KEY}                              # Retrieve from .env
-      - MOVIE_TMDB_SEED_ENABLED=${MOVIE_TMDB_SEED_ENABLED}
+      EUREKA_DEFAULT_ZONE: http://discovery:8761/eureka/      # Eureka config: point to discovery server in Docker
     ports:
       - "8083:8083"                     # host:container
 
-
-  tmdb-ingestion-service:
-    profiles:
-      - jobs
-    build:
-      context: ..
-      dockerfile: modules/tmdb-ingestion-service/Dockerfile
-    environment:
-      TMDB_API_KEY: ${TMDB_API_KEY}
-      MOVIE_SERVICE_BASE_URL: http://movie-service:8083
-    depends_on:
-      - movie-service
-    restart: no
-    # no ports needed; this is a job, not an API
 
   rating-db:                        # Rating Database Service (Container)
     image: postgres:18
@@ -131,27 +121,47 @@ services:
     build:
       context: ..                       # repo root (one level up from docker/)
       dockerfile: modules/rating-service/Dockerfile               # path from repo root to the Dockerfile
+    image: kbrown2428/microflix-rating-service:${IMAGE_TAG}
     container_name: rating-service
     restart: unless-stopped
     depends_on:
       - rating-db
       - discovery
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://rating-db:5432/ratingdb
-      - SPRING_DATASOURCE_USERNAME=rating
-      - SPRING_DATASOURCE_PASSWORD=rating
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ISSUER: ${JWT_ISSUER}
 
-      - EUREKA_DEFAULT_ZONE=http://discovery:8761/eureka/      # Eureka config: point to discovery server in Docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://rating-db:5432/ratingdb
+      SPRING_DATASOURCE_USERNAME: rating
+      SPRING_DATASOURCE_PASSWORD: rating
 
+      EUREKA_DEFAULT_ZONE: http://discovery:8761/eureka/      # Eureka config: point to discovery server in Docker
     ports:
       - "8084:8084"                     # host:container
 
+
+  tmdb-ingestion-service:
+    profiles:
+      - jobs
+    build:
+      context: ..
+      dockerfile: modules/tmdb-ingestion-service/Dockerfile
+    image: kbrown2428/microflix-tmdb-ingestion:${IMAGE_TAG}
+    environment:
+      TMDB_BASE_URL: https://api.themoviedb.org/3
+      TMDB_API_KEY: ${TMDB_API_KEY}
+      MOVIE_SERVICE_BASE_URL: http://movie-service:8083
+    depends_on:
+      - movie-service
+    restart: no
+    # no ports needed; this is a job, not an API
 
 
   frontend:                       # FRONTEND
     build:
       context: ../frontend
       dockerfile: Dockerfile
+    image: kbrown2428/microflix-frontend:${IMAGE_TAG}
     container_name: frontend
     ports:
       - "3000:3000"
@@ -160,7 +170,6 @@ services:
       GATEWAY_BASE_URL: http://gateway:8081
     depends_on:
       - gateway
-
 
 
 
