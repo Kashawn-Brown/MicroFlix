@@ -57,4 +57,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway    # allows health & info actuator endpoints for simple checks
+        include: health,info,gateway,prometheus    # allows health, info, gateway, and prometheus scrape endpoints
