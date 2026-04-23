@@ -1,0 +1,14 @@
+# Grafana datasource provisioning — auto-registers the Prometheus datasource
+# at startup so we don't have to click through the UI on every fresh volume.
+# Shape is Grafana's standard datasources provisioning schema (apiVersion 1).
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus               # deterministic UID so dashboard JSON can reference it across volume rebuilds
+    type: prometheus
+    access: proxy                 # Grafana proxies queries server-side, browser doesn't talk to Prometheus directly
+    url: http://prometheus:9090   # compose service name; reached over default network
+    isDefault: true
+    editable: false               # locked in the UI; the source of truth is this file

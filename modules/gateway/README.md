@@ -116,4 +116,18 @@ Configure Eureka client and routes in `application.yml` as usual.
 
 ---
 
+## Observability
+
+The gateway registers a Micrometer Prometheus registry and exposes Actuator on port 8081:
+
+- `GET /actuator/health` → `{ "status": "UP" }` when up
+- `GET /actuator/prometheus` → metrics scrape endpoint
+- `GET /actuator/gateway/routes` → introspect the active routes (read-only)
+
+Spring Cloud Gateway 2025.0.0 auto-emits route-level metrics with no extra config. HTTP request histogram buckets are enabled (`management.metrics.distribution.percentiles-histogram.http.server.requests: true`) so the **MicroFlix Overview** Grafana dashboard can compute p50 / p95 / p99 latency for the gateway alongside the downstream services.
+
+The `prometheus` container scrapes `gateway:8081/actuator/prometheus` every 15s.
+
+---
+
 

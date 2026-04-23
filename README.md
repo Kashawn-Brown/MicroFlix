@@ -22,6 +22,7 @@ This was built as deliberate practice, not as a product. What it demonstrates is
 - One database per data-owning service, coordinated via Docker Compose
 - Standardized error handling across services using RFC 7807 `ProblemDetail`
 - Multi-stage Docker builds, Docker Compose orchestration with separate dev and prod overrides
+- End-to-end metrics pipeline with Micrometer, Prometheus, and provisioned Grafana dashboards
 - Real CI/CD through GitHub Actions — CI builds and pushes images, CD pulls and deploys, with explicit ordering between them
 - AWS EC2 deployment with real production debugging (browser/SSR/container networking, sizing, disk pressure)
 
@@ -63,6 +64,7 @@ This was built as deliberate practice, not as a product. What it demonstrates is
 - PostgreSQL + Flyway migrations
 - Next.js (App Router), TypeScript, React 19, Tailwind CSS
 - Docker + Docker Compose
+- Micrometer + Prometheus + Grafana (metrics + dashboards)
 - JUnit 5, Mockito, Testcontainers
 - GitHub Actions for CI + EC2 deploy
 
@@ -95,6 +97,8 @@ This brings up:
 - `rating-service` on **http://localhost:8084**
 - three Postgres instances (`user-db`, `movie-db`, `rating-db`)
 - `frontend` on **http://localhost:80** (or `http://localhost:3000` in dev-only setups)
+- `prometheus` on **http://localhost:9090**
+- `grafana` on **http://localhost:3001** (admin/admin; MicroFlix Overview dashboard auto-provisioned)
 
 The frontend talks only to the **gateway**, not directly to the microservices.
 
@@ -209,6 +213,25 @@ Locally (via exposed ports):
 - Rating-service: `http://localhost:8084/actuator/health`
 
 In production these endpoints sat inside the Docker network only and were intended for future load balancers / monitoring rather than public access.
+
+### Metrics & dashboards (Micrometer + Prometheus + Grafana)
+
+All four Spring Boot services (`gateway`, `user-service`, `movie-service`, `rating-service`) register a Micrometer Prometheus registry and expose:
+
+- `GET /actuator/prometheus` → metrics scrape endpoint (HTTP server with latency histograms, JVM, HikariCP pool for the MVC services; route-level metrics on gateway)
+
+The `prometheus` container scrapes all four services every 15s. The `grafana` container is preloaded with a Prometheus datasource and the **MicroFlix Overview** dashboard, both provisioned from `docker/grafana/provisioning/` and `docker/grafana/dashboards/`. The dashboard covers:
+
+- Per-service request rate
+- p50 / p95 / p99 HTTP request latency (computed from histogram buckets)
+- HTTP status codes stacked by service and status
+- JVM heap usage
+- HikariCP connection pool (active + idle) for the three MVC services
+
+Locally:
+
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3001` (admin/admin)
 
 ### OpenAPI / Swagger UI (springdoc-openapi)
 

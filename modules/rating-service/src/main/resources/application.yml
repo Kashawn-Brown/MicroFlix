@@ -35,4 +35,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true        # emit histogram buckets so PromQL histogram_quantile() can compute p50/p95/p99
