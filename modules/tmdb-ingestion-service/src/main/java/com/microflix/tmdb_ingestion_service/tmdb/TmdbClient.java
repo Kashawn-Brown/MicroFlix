@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -21,15 +23,52 @@ public class TmdbClient {
     private final RestClient restClient;
     private final String apiKey;
 
-    public TmdbClient(@Value("${tmdb.base-url}") String baseUrl, @Value("${tmdb.api-key}") String apiKey) {
+    public TmdbClient(
+            @Value("${tmdb.base-url}") String baseUrl,
+            @Value("${tmdb.api-key}") String apiKey,
+            @Value("${tmdb.rate-limit.min-interval-ms:200}") long minIntervalMs,
+            @Value("${tmdb.rate-limit.max-retries:3}") int maxRetries,
+            @Value("${tmdb.rate-limit.retry-backoff-ms:2000}") long retryBackoffMs
+    ) {
 
         // TMDb API key injected from configuration
         this.apiKey = apiKey;
 
-        // Pre-configured RestClient with the TMDb base URL (avoid repeating it on every call).
+        // Throttle TMDb traffic and retry on 429. Scoped to this client only —
+        // MovieServiceClient's RestClient is intentionally unthrottled.
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
+                .requestInterceptor(throttlingInterceptor(minIntervalMs, maxRetries, retryBackoffMs))
                 .build();
+    }
+
+    private ClientHttpRequestInterceptor throttlingInterceptor(
+            long minIntervalMs, int maxRetries, long retryBackoffMs
+    ) {
+        return (request, body, execution) -> {
+            sleepQuietly(minIntervalMs);
+
+            int attempts = 0;
+            while (true) {
+                ClientHttpResponse response = execution.execute(request, body);
+                if (response.getStatusCode().value() != 429 || attempts >= maxRetries) {
+                    return response;
+                }
+                attempts++;
+                log.warn("TMDb returned 429 (attempt {}/{}), backing off {}ms",
+                        attempts, maxRetries, retryBackoffMs);
+                response.close();
+                sleepQuietly(retryBackoffMs);
+            }
+        };
+    }
+
+    private static void sleepQuietly(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**

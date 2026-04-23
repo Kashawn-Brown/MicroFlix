@@ -7,6 +7,10 @@ spring:
 tmdb:
   base-url: ${TMDB_BASE_URL:https://api.themoviedb.org/3}
   api-key: ${TMDB_API_KEY}   # set via environment variable
+  rate-limit:
+    min-interval-ms: 200      # 5 req/sec — well under TMDb's ~40 req/sec soft limit
+    max-retries: 3
+    retry-backoff-ms: 2000    # TMDb has no Retry-After header; fixed backoff
 
 movie-service:
   # local dev: localhost

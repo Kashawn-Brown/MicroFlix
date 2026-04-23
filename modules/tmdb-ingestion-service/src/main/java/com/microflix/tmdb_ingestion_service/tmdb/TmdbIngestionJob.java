@@ -40,6 +40,9 @@ public class TmdbIngestionJob implements CommandLineRunner {
     @Value("${ingestion.default-count:50}")
     private int defaultTargetCount;
 
+    @Value("${ingestion.max-pages:50}")
+    private int maxPages;
+
     private static final int DEFAULT_UPDATE_LIMIT = 100;
 
     // Base URLs for TMDb images: store the full URL on the Movie entity.
@@ -134,9 +137,9 @@ public class TmdbIngestionJob implements CommandLineRunner {
                 log.info("No new movies inserted on page {} across any endpoint. Stopping.", page);
                 break;
             }
-            // Safety cap: avoid crawling too many TMDb pages in one run. Only want to go through a max of 50 pages
-            if (page > 50) {
-                log.warn("Reached max page {}, stopping to avoid infinite loop.", page);
+            // Safety cap: avoid crawling too many TMDb pages in one run. Configured via ingestion.max-pages.
+            if (page > maxPages) {
+                log.warn("Reached max page {} (limit {}), stopping to avoid infinite loop.", page, maxPages);
                 break;
             }
 
