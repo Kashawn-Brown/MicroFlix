@@ -387,14 +387,198 @@ Execution Time: 0.895 ms
 
 ---
 
-## V5 — proposed contents (subject to post-V5 measurement)
+## V5 — what shipped
 
-Three indexes, in priority order:
+Migration `V5__add_tmdb_id_and_title_trgm_indexes.sql`:
 
-1. **`idx_movies_tmdb_id (tmdb_id)`** — definite. Fixes Q7 and Q8 (highest-leverage; hit thousands of times per ingestion run).
-2. **`pg_trgm` extension + `idx_movies_title_trgm` GIN on `lower(title) gin_trgm_ops`** — for Q4. Verified `pg_trgm 1.6` available in this Postgres image.
-3. **`idx_movies_title (title)`** — for Q5 title sort. Borderline at 3747 rows but cheap; include only if Step-4 re-measurement shows the planner picks it up usefully.
+```sql
+CREATE INDEX IF NOT EXISTS idx_movies_tmdb_id ON movies (tmdb_id);
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_movies_title_trgm
+    ON movies USING GIN (LOWER(title) gin_trgm_ops);
+```
 
-**Explicitly deferred:**
-- Composite `(release_year, created_at DESC)` for Q2 SELECT — current plan is already sub-millisecond; revisit only if year-filtered browsing becomes a measured hot path.
-- Promoting `tmdb_id` to a UNIQUE constraint — semantically correct, gives the index for free, but bigger lift and orthogonal to the perf goal. Flagged as a follow-up.
+**Held back from V5:** `idx_movies_title (title)` for Q5 title sort. See "Post-V5 measurements → Q5 (held back)" below for the rationale.
+
+---
+
+## Post-V5 measurements
+
+All measurements taken after Flyway applied V5 cleanly (164 ms) and `ANALYZE movies` was re-run to refresh planner stats over the new indexes.
+
+Postgres normalizes the trigram index expression as `lower(title::text)` (the cast comes from `varchar → text` for the `gin_trgm_ops` opclass). The first concern below was confirming the planner treats this as equivalent to the query's `LOWER(m.title)`.
+
+### Planner equivalence — confirmed
+
+The Q4 COUNT plan below explicitly uses `idx_movies_title_trgm` with `Index Cond: (lower((title)::text) ~~ '%love%'::text)` — the planner matches the index expression to the query's `LOWER(m.title)` predicate without intervention. Confirmed further with a no-`ORDER BY` SELECT and a more selective pattern (`%shadow%`, 12 matches), both of which the planner served via the trigram index. The takeaway: V5's index is recognized; the planner uses it whenever it's the cheaper option, and falls back to V4's sort index when sort-with-LIMIT-and-inline-filter beats trigram-bitmap-then-sort.
+
+### Q4 — Title text search: `?query=love`
+
+#### SELECT (page query)
+
+```
+Limit  (cost=0.28..116.18 rows=12 width=37) (actual time=0.282..0.562 rows=12)
+  Buffers: shared hit=57
+  ->  Index Scan using idx_movies_created_at_id on movies m
+        (cost=0.28..715.00 rows=74 width=37)
+        Filter: (lower((title)::text) ~~ '%love%'::text)
+        Rows Removed by Filter: 611
+        Buffers: shared hit=57
+Execution Time: 0.599 ms
+```
+
+| | Before V5 | After V5 |
+|---|---|---|
+| Plan | Seq Scan + top-N heapsort | Index Scan idx_movies_created_at_id + filter |
+| Time | 3.66 ms | **0.60 ms** (~6× faster) |
+| Buffers | 229 | **57** (~4× fewer) |
+
+The planner did not pick the trigram index for this exact query. With LIMIT 12 + ORDER BY created_at DESC and ~63 matches in 3747 rows (~1.7%), walking V5's sort index in already-sorted order and filtering 611 rows beats trigram-bitmap-then-sort. The trigram index still helped: pg_trgm gives the planner better selectivity estimates for LIKE patterns (estimated rows shifted from 30 → 74), which contributed to the cost-model shift even when the trigram path itself wasn't taken.
+
+#### COUNT
+
+```
+Aggregate  (actual time=0.491..0.493 rows=1)
+  Buffers: shared hit=58
+  ->  Bitmap Heap Scan on movies m  (actual time=0.146..0.479 rows=63)
+        Recheck Cond: (lower((title)::text) ~~ '%love%'::text)
+        ->  Bitmap Index Scan on idx_movies_title_trgm
+              (actual time=0.102..0.102 rows=63)
+              Index Cond: (lower((title)::text) ~~ '%love%'::text)
+              Buffers: shared hit=5
+Execution Time: 0.687 ms
+```
+
+| | Before V5 | After V5 |
+|---|---|---|
+| Plan | Seq Scan | Bitmap Index Scan idx_movies_title_trgm + Bitmap Heap Scan |
+| Time | 2.00 ms | **0.69 ms** (~3× faster) |
+| Buffers | 226 | **58** (~4× fewer) |
+
+#### Trigram path proof — selective pattern (`%shadow%`, 12 matches)
+
+```
+Limit  (actual time=0.121..0.123 rows=12)
+  Buffers: shared hit=24
+  ->  Sort  (actual time=0.120..0.121 rows=12)
+        Sort Key: created_at DESC
+        ->  Bitmap Heap Scan on movies m  (actual time=0.032..0.060 rows=12)
+              Recheck Cond: (lower((title)::text) ~~ '%shadow%'::text)
+              ->  Bitmap Index Scan on idx_movies_title_trgm
+                    (actual time=0.025..0.025 rows=12)
+Execution Time: 0.138 ms
+```
+
+When the pattern is selective enough that `trigram-bitmap → sort` beats `sort-index walk → filter`, the planner picks the trigram path. **0.14 ms** for a 12-match search. Confirms the cost-based decision works correctly.
+
+### Q7 — `existsByTmdbId(?)` — ingestion idempotency check
+
+```
+Result  (actual time=0.061..0.062 rows=1)
+  Buffers: shared hit=4 read=2
+  InitPlan 1
+    ->  Index Only Scan using idx_movies_tmdb_id on movies m
+          (actual time=0.060..0.060 rows=1)
+          Index Cond: (tmdb_id = 1419406)
+          Heap Fetches: 0
+Execution Time: 0.127 ms
+```
+
+| | Before V5 | After V5 |
+|---|---|---|
+| Plan | Seq Scan (lucky early hit on this id) | Index Only Scan idx_movies_tmdb_id |
+| Time | 0.06 ms* | 0.13 ms |
+| Buffers | 2 | 6 |
+
+\* The before-number was misleadingly fast: the seq scan happened to find the row in buffer 2. After V5 the scan is structural (Index Only Scan, O(log n)) and predictable regardless of where the row sits — the miss / deep-hit cases (Q8) show the real before/after picture.
+
+### Q8 — `findByTmdbId(?)`
+
+#### Hit case
+
+```
+Index Scan using idx_movies_tmdb_id on movies m  (actual time=0.011..0.012 rows=1)
+  Index Cond: (tmdb_id = 1419406)
+  Buffers: shared hit=3
+Execution Time: 0.043 ms
+```
+
+| | Before V5 | After V5 |
+|---|---|---|
+| Plan | Seq Scan, 3746 rows removed | Index Scan idx_movies_tmdb_id |
+| Time | 1.20 ms | **0.04 ms** (~28× faster) |
+| Buffers | 226 | **3** (~75× fewer) |
+
+#### Miss case
+
+```
+Index Scan using idx_movies_tmdb_id on movies m  (actual time=0.024..0.024 rows=0)
+  Index Cond: (tmdb_id = 99999999)
+  Buffers: shared hit=1 read=1
+Execution Time: 0.034 ms
+```
+
+| | Before V5 | After V5 |
+|---|---|---|
+| Plan | Seq Scan, 3747 rows removed | Index Scan idx_movies_tmdb_id |
+| Time | 0.90 ms | **0.03 ms** (~26× faster) |
+| Buffers | 226 | **2** (~113× fewer) |
+
+These are the highest-leverage wins. `existsByTmdbId` is hit per-movie during ingestion — the 5000-count seed run made thousands of these calls. The buffer-count drop (226 → 2) is also significant beyond the latency: full Seq Scans pollute the buffer cache with all heap pages of `movies` on every call, evicting hot pages used by foreground queries.
+
+### Q5 — Title sort (held back from V5)
+
+Re-measured for completeness; plan unchanged from baseline since V5 didn't touch this path.
+
+```
+Limit  (actual time=1.914..1.916 rows=12)
+  Buffers: shared hit=229
+  ->  Sort  Sort Method: top-N heapsort  Memory: 26kB
+        ->  Seq Scan on movies m  (actual time=0.008..1.096 rows=3747)
+Execution Time: 1.944 ms
+```
+
+**Decision: defer.** `idx_movies_title (title)` would replace the Seq Scan + top-N with an Index Scan and bring this to sub-millisecond. But:
+
+- Title sort is a **user-initiated** sort change (default is `created_desc`), not hit on every page load.
+- ~2 ms at the current catalog size isn't pain.
+- "Don't solve problems we don't have yet."
+
+**Revisit when:** the catalog grows past ~50k movies, or k6 measurements in Branch 3 show title-sort browsing as a measured hot path.
+
+### V4-covered queries — sanity checks (no regression)
+
+| Query | Baseline | Post-V5 | Plan |
+|---|---|---|---|
+| Q1 default browse SELECT | 0.05 ms / 4 buf | 0.07 ms / 4 buf | unchanged — Index Scan idx_movies_created_at_id |
+| Q3 genre filter COUNT | 0.94 ms / 19 buf | 1.7 ms / 19 buf† | unchanged — Merge Join + idx_movie_genres_genre_movie |
+| Q6 PK lookup | 0.08 ms / 6 buf | 0.05 ms / 6 buf | unchanged — Index Scan movies_pkey |
+
+† Time variance within run-to-run noise; identical plan, identical buffer count, identical cost estimate.
+
+---
+
+## Final V4 + V5 coverage map
+
+| Query | Plan | Status |
+|---|---|---|
+| Q1 default browse SELECT | Index Scan idx_movies_created_at_id | ✅ V4 |
+| Q1 default browse COUNT | Index Only Scan PK | ✅ optimal |
+| Q2 year filter SELECT | Index Scan sort + filter | ⚠️ V4 partial — composite oppty deferred |
+| Q2 year filter COUNT | Bitmap idx_movies_release_year | ✅ V4 |
+| Q3 genre filter SELECT | Nested Loop via idx_movies_created_at_id + uk_movie_genre | ✅ V4 + UNIQUE |
+| Q3 genre filter COUNT | Merge Join + idx_movie_genres_genre_movie | ✅ V4 |
+| Q4 title ILIKE SELECT | Index Scan sort + trigram-aware filter (or trigram bitmap when selective) | ✅ **V5** |
+| Q4 title ILIKE COUNT | Bitmap idx_movies_title_trgm | ✅ **V5** |
+| Q5 title sort | Seq Scan + top-N heapsort | ⚠️ **deferred** — see above |
+| Q5 year sort | Index Scan Backward idx_movies_release_year | ✅ V4 |
+| Q6 PK lookup | Index Scan movies_pkey | ✅ optimal |
+| Q7 existsByTmdbId | Index Only Scan idx_movies_tmdb_id | ✅ **V5** |
+| Q8 findByTmdbId | Index Scan idx_movies_tmdb_id | ✅ **V5** |
+
+**Net result:** 11 of 12 hot-query plans now optimal or near-optimal. The remaining gap (Q5 title sort) is documented and deferred with a clear threshold for revisit. Q2 SELECT's composite-index opportunity is documented and deferred for the same reason.
+
+**Additional follow-ups surfaced by this analysis** (consider adding to `docs/future-work.md`):
+- Promote `tmdb_id` to UNIQUE constraint (semantically correct; index would come for free; deferred as larger lift orthogonal to the perf goal).
+- Composite `(release_year, created_at DESC)` for Q2 SELECT — only if year-filtered browsing becomes a measured hot path.
+- `idx_movies_title (title)` btree for title sort — revisit at ~50k catalog or if Branch 3 k6 measurements show title sort hot.
