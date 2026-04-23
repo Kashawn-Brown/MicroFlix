@@ -87,6 +87,9 @@ All error responses use the same basic shape (status, title, detail) so the fron
 * Health:
 
   * `GET /actuator/health` → `{ "status": "UP" }`
+* Prometheus metrics scrape (HTTP server, JVM, HikariCP pool):
+
+  * `GET /actuator/prometheus`
 * OpenAPI JSON:
 
   * `GET /v3/api-docs`
