@@ -124,6 +124,9 @@ All errors are returned as `application/problem+json` so the frontend can treat 
 * Health:
 
   * `GET /actuator/health`
+* Prometheus metrics scrape (HTTP server, JVM, HikariCP pool):
+
+  * `GET /actuator/prometheus`
 * OpenAPI JSON:
 
   * `GET /v3/api-docs`
