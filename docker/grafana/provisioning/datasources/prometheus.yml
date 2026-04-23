@@ -6,6 +6,7 @@ apiVersion: 1
 
 datasources:
   - name: Prometheus
+    uid: prometheus               # deterministic UID so dashboard JSON can reference it across volume rebuilds
     type: prometheus
     access: proxy                 # Grafana proxies queries server-side, browser doesn't talk to Prometheus directly
     url: http://prometheus:9090   # compose service name; reached over default network

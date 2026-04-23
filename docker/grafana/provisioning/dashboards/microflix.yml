@@ -1,0 +1,15 @@
+# Grafana dashboard provider — tells Grafana where to find dashboard JSON files
+# at startup, how often to reload them, and whether the UI can edit them.
+
+apiVersion: 1
+
+providers:
+  - name: 'MicroFlix'
+    orgId: 1
+    folder: ''                    # General folder
+    type: file
+    disableDeletion: false        # UI can delete; file reload restores
+    updateIntervalSeconds: 10     # poll interval for file changes
+    allowUiUpdates: true          # UI edits saved to Grafana DB; file remains source of truth on next reload
+    options:
+      path: /etc/grafana/dashboards
