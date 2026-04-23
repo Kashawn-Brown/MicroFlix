@@ -106,25 +106,25 @@ public class TmdbIngestionJob implements CommandLineRunner {
             added = seedMovies(tmdbClient.fetchPopularMovies(page), "Popular Movies", newlySeededTmdbIds);
             insertedThisPage += added;
             insertedTotal += added;
-            if(reachedTarget(targetCount, insertedTotal+insertedThisPage)) break;
+            if(reachedTarget(targetCount, insertedTotal)) break;
 
             // --- Top Rated ---
             added = seedMovies(tmdbClient.fetchTopRatedMovies(page), "Top Rated Movies", newlySeededTmdbIds);
             insertedThisPage += added;
             insertedTotal += added;
-            if(reachedTarget(targetCount, insertedTotal+insertedThisPage)) break;
+            if(reachedTarget(targetCount, insertedTotal)) break;
 
             // --- Now Playing ---
             added = seedMovies(tmdbClient.fetchNowPlayingMovies(page), "Now Playing Movies", newlySeededTmdbIds);
             insertedThisPage += added;
             insertedTotal += added;
-            if(reachedTarget(targetCount, insertedTotal+insertedThisPage)) break;
+            if(reachedTarget(targetCount, insertedTotal)) break;
 
             // --- Upcoming ---
             added = seedMovies(tmdbClient.fetchUpcomingMovies(page), "Upcoming Movies", newlySeededTmdbIds);
             insertedThisPage += added;
             insertedTotal += added;
-            if(reachedTarget(targetCount, insertedTotal+insertedThisPage)) break;
+            if(reachedTarget(targetCount, insertedTotal)) break;
 
             // --- Discover (no early break needed here) ---
             added = seedMovies(tmdbClient.discoverPopularMovies(page), "Discover Movies", newlySeededTmdbIds);
