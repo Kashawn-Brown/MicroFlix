@@ -1,0 +1,29 @@
+# Scrape configuration for MicroFlix services.
+# Targets are reached over the compose default network by container name.
+# Ports are the INTERNAL listen ports (server.port in each service's
+# application.yml), not the host-mapped ports.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['gateway:8081']
+
+  - job_name: movie-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['movie-service:8083']
+
+  - job_name: user-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['user-service:8082']
+
+  - job_name: rating-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['rating-service:8084']

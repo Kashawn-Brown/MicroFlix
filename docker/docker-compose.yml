@@ -172,11 +172,28 @@ services:
       - gateway
 
 
+  prometheus:                     # Prometheus — scrapes /actuator/prometheus on each instrumented service
+    image: prom/prometheus:v3.11.2
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - gateway
+      - movie-service
+      - user-service
+      - rating-service
+
+
 
 volumes:
   pg_user_data:
   pg_movie_data:
   pg_rating_data:
+  prometheus_data:
 
 
 
