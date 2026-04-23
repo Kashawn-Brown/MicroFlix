@@ -14,6 +14,7 @@ Unlike the other Spring Boot apps, this service does **not** expose an HTTP API.
   - Skip movies with missing `tmdbId`.
   - Call `movie-service`’s internal `GET /api/internal/v1/movies/exists-by-tmdb/{tmdbId}` to avoid inserting duplicates.
 - Insert new movies via `POST /api/v1/movies` on `movie-service`.
+- Throttle TMDb traffic and retry on 429: every TMDb call is rate-limited at the client level (default 200ms minimum interval, ~5 req/sec) with bounded retry-on-429. Scoped to TMDb only — calls back to `movie-service` stay unthrottled.
 - **Optionally enrich movies after seeding**:
   - For movies created in this run (`--enrich`), fetch TMDb detail and PATCH fields like `runtime`.
   - For existing movies missing runtime (`--enrich-runtime`), fetch candidates from `movie-service` and backfill their runtime.
@@ -72,6 +73,18 @@ The ingestion service uses this base URL to call:
 - `GET /api/internal/v1/movies/needs-runtime` – fetch movies that have a `tmdbId` but no `runtime` yet (runtime backfill mode).
 - `PATCH /api/internal/v1/movies/{id}` – partial update by internal id (used for generic backfill).
 - `PATCH /api/internal/v1/movies/by-tmdb/{tmdbId}` – partial update by TMDb id (used when enriching movies created in this run).
+
+### TMDb rate limiting
+
+```yaml
+tmdb:
+  rate-limit:
+    min-interval-ms: 200    # minimum gap between consecutive TMDb calls (~5 req/sec)
+    max-retries: 3          # retry attempts on HTTP 429 before giving up
+    retry-backoff-ms: 2000  # fixed sleep between retries
+```
+
+Defaults are conservative against TMDb's ~40 req/sec soft limit. The throttle is per-process and lives inside `TmdbClient`'s `RestClient` — no shared limiter, no concurrency story to manage in this batch job.
 
 ### Ingestion tuning
 

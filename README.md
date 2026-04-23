@@ -23,6 +23,7 @@ This was built as deliberate practice, not as a product. What it demonstrates is
 - Standardized error handling across services using RFC 7807 `ProblemDetail`
 - Multi-stage Docker builds, Docker Compose orchestration with separate dev and prod overrides
 - End-to-end metrics pipeline with Micrometer, Prometheus, and provisioned Grafana dashboards
+- Performance work driven by measurement: a meaningful TMDb-seeded catalog (~3.7k movies, ~8.4k movie–genre links), `EXPLAIN ANALYZE` against the hot query paths, targeted indexes added through Flyway, and explicit "considered but rejected" entries where adding an index wasn't worth its write cost
 - Real CI/CD through GitHub Actions — CI builds and pushes images, CD pulls and deploys, with explicit ordering between them
 - AWS EC2 deployment with real production debugging (browser/SSR/container networking, sizing, disk pressure)
 
@@ -36,10 +37,10 @@ This was built as deliberate practice, not as a product. What it demonstrates is
   User registration, login (JWT), `/users/me`, profile update, and password change.
 
 - `modules/movie-service`  
-  Movie metadata (title, overview, year, genres, poster/backdrop) with search/filter/sort + pagination and TMDb-based seeding.
+  Movie metadata (title, overview, year, genres, poster/backdrop) with search/filter/sort + pagination, TMDb-based seeding, and Flyway-managed indexes (V4 base coverage; V5 added trigram search and `tmdb_id` lookup; V6 promoted `tmdb_id` to UNIQUE).
 
 - `modules/tmdb-ingestion-service`  
-  One-shot Spring Boot job that seeds movies from TMDb into `movie-service` and can enrich them (e.g. runtime) via internal APIs.
+  One-shot Spring Boot job that seeds movies from TMDb into `movie-service` and can enrich them (e.g. runtime). Throttled per-call against TMDb's rate limit with retry-on-429. Two modes: full seeding (default) and `--mode=scheduled` (volatile endpoints + date-windowed `discover`) for cron-style top-ups.
 
 - `modules/rating-service`  
   Movie ratings (1–10 scale with 0.1 increments, stored as `rating_times_ten`) plus a watchlist feature via a generic `engagements` table.
@@ -120,9 +121,15 @@ docker compose --profile jobs run --rm tmdb-ingestion-service --count=50 --enric
 
 # Backfill runtimes for any existing movies missing runtime (generic enrichment)
 docker compose --profile jobs run --rm tmdb-ingestion-service --enrich-runtime --update-limit=200
+
+# Scheduled-mode top-up: skips popular/top_rated, uses date-windowed discover.
+# This is the right shape for cron / scheduled GitHub Action runs.
+docker compose --profile jobs run --rm tmdb-ingestion-service --mode=scheduled --count=50
 ```
 
 The `--count` flag controls how many new movies to insert (0 or missing means "use default" from config). The `--update-limit` flag controls how many movies to update in backfill mode.
+
+The `--mode=` flag selects the endpoint set: `full` (default) hits all five TMDb list endpoints; `scheduled` hits only `now_playing`, `upcoming`, and a date-windowed `discover`. See `modules/tmdb-ingestion-service/README.md` for details.
 
 > **Note:** After changing code in `tmdb-ingestion-service`, run:
 >
@@ -333,5 +340,6 @@ Branch protection rules required the CI checks to pass before merging into `main
 - `modules/rating-service/README.md` – ratings, watchlist, and engagement model.
 - `modules/gateway/README.md` – routes and aggregated catalog endpoints.
 - `frontend/README.md` – Next.js UI and how it talks to the gateway.
+- `docs/explain-analyze.md` – measurement-driven index analysis: V4 baseline coverage, V5/V6 additions, and "considered but rejected" decisions.
 
 ---

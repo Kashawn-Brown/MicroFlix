@@ -398,7 +398,7 @@ CREATE INDEX IF NOT EXISTS idx_movies_title_trgm
     ON movies USING GIN (LOWER(title) gin_trgm_ops);
 ```
 
-**Held back from V5:** `idx_movies_title (title)` for Q5 title sort. See "Post-V5 measurements → Q5 (held back)" below for the rationale.
+**Held back from V5:** `idx_movies_title (title)` for Q5 title sort — re-measured below and ultimately rejected outright (see "Indexes considered — one added, two rejected").
 
 ---
 
@@ -575,8 +575,6 @@ Execution Time: 1.944 ms
 | Q6 PK lookup | Index Scan movies_pkey | ✅ optimal |
 | Q7 existsByTmdbId | Index Only Scan idx_movies_tmdb_id | ✅ **V5** |
 | Q8 findByTmdbId | Index Scan idx_movies_tmdb_id | ✅ **V5** |
-
-**Net result:** 11 of 12 hot-query plans now optimal or near-optimal. The remaining gap (Q5 title sort) is documented and deferred with a clear threshold for revisit. Q2 SELECT's composite-index opportunity is documented and deferred for the same reason.
 
 ## Indexes considered — one added, two rejected
 
