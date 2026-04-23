@@ -43,12 +43,16 @@ Responses are mapped to DTOs (e.g., `MovieResponse`) and include genres and post
 
 - **Flyway migrations** create:
   - `movies`, `genres`, `movie_genres` tables
-  - targeted **indexes** on hot query paths, for example:
-    - `created_at, id` (for `created_desc` pagination)
-    - `release_year` (for year filter)
-    - `movie_genres(genre_id, movie_id)` (for genre filtering)
+  - **V4 — base hot-path indexes:**
+    - `idx_movies_created_at_id (created_at DESC, id)` for default `created_desc` pagination
+    - `idx_movies_release_year` for year filter and year sort
+    - `idx_movie_genres_genre_movie (genre_id, movie_id)` for genre filtering
+  - **V5 — measurement-driven additions:**
+    - `idx_movies_tmdb_id` for ingestion's `existsByTmdbId` / `findByTmdbId` path (was a Seq Scan; ~30× faster after)
+    - `idx_movies_title_trgm` (pg_trgm GIN over `LOWER(title)`) for `?query=` substring search
+  - **V6 — `tmdb_id` promoted to a UNIQUE constraint** (`uk_movies_tmdb_id`), replacing V5's plain index. Same read characteristics, but the integrity guarantee now lives in the DB instead of only in the ingestion job.
 
-Movie search was benchmarked under load with tools like `autocannon`, and these indexes were validated using `EXPLAIN ANALYZE` to keep high-percentile latency stable while increasing throughput.
+The full measurement story — baseline plans, post-V5/V6 plans, and the indexes that were *considered but rejected* (composite year+created_at, plain title btree) because they'd add INSERT cost without matching read pain — lives in [`docs/explain-analyze.md`](../../docs/explain-analyze.md).
 
 ---
 ## TMDb integration

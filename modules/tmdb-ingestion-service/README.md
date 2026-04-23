@@ -14,6 +14,7 @@ Unlike the other Spring Boot apps, this service does **not** expose an HTTP API.
   - Skip movies with missing `tmdbId`.
   - Call `movie-service`’s internal `GET /api/internal/v1/movies/exists-by-tmdb/{tmdbId}` to avoid inserting duplicates.
 - Insert new movies via `POST /api/v1/movies` on `movie-service`.
+- Throttle TMDb traffic and retry on 429: every TMDb call is rate-limited at the client level (default 200ms minimum interval, ~5 req/sec) with bounded retry-on-429. Scoped to TMDb only — calls back to `movie-service` stay unthrottled.
 - **Optionally enrich movies after seeding**:
   - For movies created in this run (`--enrich`), fetch TMDb detail and PATCH fields like `runtime`.
   - For existing movies missing runtime (`--enrich-runtime`), fetch candidates from `movie-service` and backfill their runtime.
@@ -23,6 +24,15 @@ Unlike the other Spring Boot apps, this service does **not** expose an HTTP API.
   - Or when the configured maximum TMDb page limit is hit.
 
 This keeps the ingestion job **idempotent** and safe to re-run without duplicating data in the movie catalog.
+
+### Ingestion modes
+
+The job has two seeding modes, selected by the `--mode=` flag:
+
+- **`full` (default)** — pulls from all five TMDb list endpoints (`popular`, `top_rated`, `now_playing`, `upcoming`, and `discover` sorted by popularity). Use this for initial seeding or any time you want to broadly grow the catalog.
+- **`--mode=scheduled`** — pulls only from the volatile endpoints: `now_playing`, `upcoming`, and a date-windowed `discover` (last 30 days, no `vote_count` floor). Skips `popular` and `top_rated` because those drift slowly and re-pulling them on every cron tick burns the TMDb rate budget on movies we already have.
+
+Both modes share the same per-movie dedupe (`existsByTmdbId`), pagination limits, and `--enrich` / `--count` flag handling.
 
 ---
 
@@ -64,6 +74,18 @@ The ingestion service uses this base URL to call:
 - `PATCH /api/internal/v1/movies/{id}` – partial update by internal id (used for generic backfill).
 - `PATCH /api/internal/v1/movies/by-tmdb/{tmdbId}` – partial update by TMDb id (used when enriching movies created in this run).
 
+### TMDb rate limiting
+
+```yaml
+tmdb:
+  rate-limit:
+    min-interval-ms: 200    # minimum gap between consecutive TMDb calls (~5 req/sec)
+    max-retries: 3          # retry attempts on HTTP 429 before giving up
+    retry-backoff-ms: 2000  # fixed sleep between retries
+```
+
+Defaults are conservative against TMDb's ~40 req/sec soft limit. The throttle is per-process and lives inside `TmdbClient`'s `RestClient` — no shared limiter, no concurrency story to manage in this batch job.
+
 ### Ingestion tuning
 
 ```yaml
@@ -102,6 +124,10 @@ mvn spring-boot:run -Dspring-boot.run.arguments="--count=50 --enrich"
 
 # Backfill runtimes for existing movies that are missing runtime
 mvn spring-boot:run -Dspring-boot.run.arguments="--enrich-runtime --update-limit=200"
+
+# Scheduled mode: only hit the volatile endpoints (now_playing, upcoming,
+# date-windowed discover). Skips popular and top_rated.
+mvn spring-boot:run -Dspring-boot.run.arguments="--mode=scheduled --count=50"
 ```
 
 Make sure `movie-service` is running on `http://localhost:8083` and `TMDB_API_KEY` is set in your environment.
@@ -137,6 +163,12 @@ To backfill runtime for existing movies that are missing it:
 
 ```bash
 docker compose --profile jobs run --rm tmdb-ingestion-service --enrich-runtime --update-limit=200
+```
+
+To run a scheduled-mode top-up (skips `popular` / `top_rated`, uses date-windowed `discover`):
+
+```bash
+docker compose --profile jobs run --rm tmdb-ingestion-service --mode=scheduled --count=50
 ```
 
 * Omitting `--count` makes it fall back to `ingestion.default-count` from `application.yml`.
@@ -195,6 +227,13 @@ To backfill runtime for older movies:
 ```bash
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
   --profile jobs run --rm tmdb-ingestion-service --enrich-runtime --update-limit=200
+```
+
+For a scheduled top-up (skips evergreen endpoints — the right shape for cron / GitHub Action runs):
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile jobs run --rm tmdb-ingestion-service --mode=scheduled --count=50
 ```
 
 This command can later be wired into a **cron job**, a scheduled GitHub Action, or a manual run whenever you want to top up the catalog with more TMDb movies.
