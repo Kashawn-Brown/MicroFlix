@@ -13,7 +13,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.*;
+import java.util.function.IntFunction;
 
 /**
  * CommandLineRunner that runs once when the app starts.
@@ -45,9 +47,21 @@ public class TmdbIngestionJob implements CommandLineRunner {
 
     private static final int DEFAULT_UPDATE_LIMIT = 100;
 
+    // Scheduled mode pulls fresh releases from /discover within this window.
+    // 30 days is wide enough to absorb a missed cron tick or two without
+    // re-fetching evergreen catalog.
+    private static final int SCHEDULED_DISCOVER_WINDOW_DAYS = 30;
+
     // Base URLs for TMDb images: store the full URL on the Movie entity.
     private static final String TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p/w500";
     private static final String TMDB_BACKDROP_BASE_URL = "https://image.tmdb.org/t/p/w780";
+
+    /**
+     * One TMDb list endpoint to pull from in a seeding pass: a human-readable
+     * label and a function that fetches a given page. Lets runSeeding iterate
+     * a data-driven endpoint list per mode instead of hand-coding each call.
+     */
+    private record IngestionEndpoint(String name, IntFunction<TmdbMovieListResponse> fetchPage) {}
 
 
     /**
@@ -58,6 +72,9 @@ public class TmdbIngestionJob implements CommandLineRunner {
         // Check for flags
         boolean enrichNew = hasFlag(args, "--enrich");
         boolean enrichRuntimeOnly = hasFlag(args, "--enrich-runtime");
+        // Scheduled mode skips the slow-moving evergreen endpoints (popular,
+        // top_rated) and uses a date-windowed discover. See endpointsFor().
+        boolean scheduledMode = hasFlag(args, "--mode=scheduled");
 
         // If flag for runtime-only enrichment, ignore seeding.
         if (enrichRuntimeOnly) {
@@ -72,7 +89,7 @@ public class TmdbIngestionJob implements CommandLineRunner {
         // Track which tmdbIds we actually inserted during this run.
         Set<Long> newlySeededTmdbIds = new LinkedHashSet<>();
 
-        runSeeding(targetCount, newlySeededTmdbIds);
+        runSeeding(targetCount, scheduledMode, newlySeededTmdbIds);
 
         if (enrichNew && !newlySeededTmdbIds.isEmpty()) {
             enrichSeededMovies(newlySeededTmdbIds);
@@ -84,53 +101,35 @@ public class TmdbIngestionJob implements CommandLineRunner {
 
     /**
      * Seeding mode:
-     * - Fetches lists of movies from TMDb
+     * - Fetches lists of movies from TMDb (endpoint set chosen by mode)
      * - Inserts new movies into movie-service until targetCount or limits are reached.
      * - Records tmdbIds of movies that were created in this run.
     */
-    public void runSeeding(int targetCount, Set<Long> newlySeededTmdbIds) {
+    public void runSeeding(int targetCount, boolean scheduledMode, Set<Long> newlySeededTmdbIds) {
 
-        log.info("Starting TMDb ingestion job with targetCount={}", targetCount);
+        List<IngestionEndpoint> endpoints = endpointsFor(scheduledMode);
+
+        log.info("Starting TMDb ingestion job with targetCount={}, mode={}, endpoints={}",
+                targetCount,
+                scheduledMode ? "scheduled" : "full",
+                endpoints.stream().map(IngestionEndpoint::name).toList());
 
 
         int insertedTotal = 0;
         int page = 1;
 
         // Keep going until we hit the target or decide to stop via break conditions.
+        outer:
         while(!reachedTarget(targetCount, insertedTotal)) {
 
-            int added = 0;
             int insertedThisPage = 0;
 
-            // --- Popular ---
-            added = seedMovies(tmdbClient.fetchPopularMovies(page), "Popular Movies", newlySeededTmdbIds);
-            insertedThisPage += added;
-            insertedTotal += added;
-            if(reachedTarget(targetCount, insertedTotal)) break;
-
-            // --- Top Rated ---
-            added = seedMovies(tmdbClient.fetchTopRatedMovies(page), "Top Rated Movies", newlySeededTmdbIds);
-            insertedThisPage += added;
-            insertedTotal += added;
-            if(reachedTarget(targetCount, insertedTotal)) break;
-
-            // --- Now Playing ---
-            added = seedMovies(tmdbClient.fetchNowPlayingMovies(page), "Now Playing Movies", newlySeededTmdbIds);
-            insertedThisPage += added;
-            insertedTotal += added;
-            if(reachedTarget(targetCount, insertedTotal)) break;
-
-            // --- Upcoming ---
-            added = seedMovies(tmdbClient.fetchUpcomingMovies(page), "Upcoming Movies", newlySeededTmdbIds);
-            insertedThisPage += added;
-            insertedTotal += added;
-            if(reachedTarget(targetCount, insertedTotal)) break;
-
-            // --- Discover (no early break needed here) ---
-            added = seedMovies(tmdbClient.discoverPopularMovies(page), "Discover Movies", newlySeededTmdbIds);
-            insertedThisPage += added;
-            insertedTotal += added;
-
+            for (IngestionEndpoint endpoint : endpoints) {
+                int added = seedMovies(endpoint.fetchPage().apply(page), endpoint.name(), newlySeededTmdbIds);
+                insertedThisPage += added;
+                insertedTotal += added;
+                if (reachedTarget(targetCount, insertedTotal)) break outer;
+            }
 
             // If nothing new was inserted from any endpoint for this page, there is no point continuing to the next page
             if (insertedThisPage == 0 && insertedTotal > 0) {
@@ -149,6 +148,34 @@ public class TmdbIngestionJob implements CommandLineRunner {
 
         log.info("TMDb ingestion job finished. Inserted {} total movies.", insertedTotal);
 
+    }
+
+    /**
+     * Endpoint set per mode. Full mode (default) ingests broadly across all five
+     * TMDb list endpoints. Scheduled mode skips popular and top_rated — those
+     * lists drift slowly and re-fetching them on a cron tick burns the rate
+     * budget on movies we already have. The discover call is date-windowed to
+     * surface fresh releases instead of the same evergreen long tail.
+     */
+    private List<IngestionEndpoint> endpointsFor(boolean scheduledMode) {
+        if (scheduledMode) {
+            LocalDate sinceDate = LocalDate.now().minusDays(SCHEDULED_DISCOVER_WINDOW_DAYS);
+            return List.of(
+                    new IngestionEndpoint("Now Playing Movies", tmdbClient::fetchNowPlayingMovies),
+                    new IngestionEndpoint("Upcoming Movies", tmdbClient::fetchUpcomingMovies),
+                    new IngestionEndpoint(
+                            "Discover Recent Movies (release_date.gte=" + sinceDate + ")",
+                            page -> tmdbClient.discoverRecentMovies(page, sinceDate)
+                    )
+            );
+        }
+        return List.of(
+                new IngestionEndpoint("Popular Movies", tmdbClient::fetchPopularMovies),
+                new IngestionEndpoint("Top Rated Movies", tmdbClient::fetchTopRatedMovies),
+                new IngestionEndpoint("Now Playing Movies", tmdbClient::fetchNowPlayingMovies),
+                new IngestionEndpoint("Upcoming Movies", tmdbClient::fetchUpcomingMovies),
+                new IngestionEndpoint("Discover Movies", tmdbClient::discoverPopularMovies)
+        );
     }
 
     /**

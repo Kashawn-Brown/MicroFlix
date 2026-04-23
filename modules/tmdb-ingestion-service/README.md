@@ -24,6 +24,15 @@ Unlike the other Spring Boot apps, this service does **not** expose an HTTP API.
 
 This keeps the ingestion job **idempotent** and safe to re-run without duplicating data in the movie catalog.
 
+### Ingestion modes
+
+The job has two seeding modes, selected by the `--mode=` flag:
+
+- **`full` (default)** — pulls from all five TMDb list endpoints (`popular`, `top_rated`, `now_playing`, `upcoming`, and `discover` sorted by popularity). Use this for initial seeding or any time you want to broadly grow the catalog.
+- **`--mode=scheduled`** — pulls only from the volatile endpoints: `now_playing`, `upcoming`, and a date-windowed `discover` (last 30 days, no `vote_count` floor). Skips `popular` and `top_rated` because those drift slowly and re-pulling them on every cron tick burns the TMDb rate budget on movies we already have.
+
+Both modes share the same per-movie dedupe (`existsByTmdbId`), pagination limits, and `--enrich` / `--count` flag handling.
+
 ---
 
 ## Configuration
@@ -102,6 +111,10 @@ mvn spring-boot:run -Dspring-boot.run.arguments="--count=50 --enrich"
 
 # Backfill runtimes for existing movies that are missing runtime
 mvn spring-boot:run -Dspring-boot.run.arguments="--enrich-runtime --update-limit=200"
+
+# Scheduled mode: only hit the volatile endpoints (now_playing, upcoming,
+# date-windowed discover). Skips popular and top_rated.
+mvn spring-boot:run -Dspring-boot.run.arguments="--mode=scheduled --count=50"
 ```
 
 Make sure `movie-service` is running on `http://localhost:8083` and `TMDB_API_KEY` is set in your environment.
@@ -137,6 +150,12 @@ To backfill runtime for existing movies that are missing it:
 
 ```bash
 docker compose --profile jobs run --rm tmdb-ingestion-service --enrich-runtime --update-limit=200
+```
+
+To run a scheduled-mode top-up (skips `popular` / `top_rated`, uses date-windowed `discover`):
+
+```bash
+docker compose --profile jobs run --rm tmdb-ingestion-service --mode=scheduled --count=50
 ```
 
 * Omitting `--count` makes it fall back to `ingestion.default-count` from `application.yml`.
@@ -195,6 +214,13 @@ To backfill runtime for older movies:
 ```bash
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
   --profile jobs run --rm tmdb-ingestion-service --enrich-runtime --update-limit=200
+```
+
+For a scheduled top-up (skips evergreen endpoints — the right shape for cron / GitHub Action runs):
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile jobs run --rm tmdb-ingestion-service --mode=scheduled --count=50
 ```
 
 This command can later be wired into a **cron job**, a scheduled GitHub Action, or a manual run whenever you want to top up the catalog with more TMDb movies.

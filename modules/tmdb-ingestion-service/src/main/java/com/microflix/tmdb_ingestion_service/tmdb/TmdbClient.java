@@ -10,6 +10,9 @@ import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.web.client.RestClient;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
 /**
  * Thin wrapper around the TMDb API.
  * Responsible for making HTTP calls and mapping responses to DTOs.
@@ -155,6 +158,32 @@ public class TmdbClient {
                         .queryParam("api_key", apiKey)
                         .queryParam("sort_by", "popularity.desc")
                         .queryParam("vote_count.gte", 250)
+                        .queryParam("page", page)
+                        .queryParam("language", "en-US")
+                        .build()
+                )
+                .retrieve()
+                .body(TmdbMovieListResponse.class);
+    }
+
+
+    /**
+     * Fetches recently-released movies via /discover. Used by scheduled ingestion
+     * runs to surface new releases without paying for evergreen catalog pages.
+     * sinceDate maps to TMDb's release_date.gte filter (inclusive). No vote_count
+     * floor here — fresh releases haven't accumulated votes yet, and gating on
+     * them would defeat the freshness goal.
+     */
+    public TmdbMovieListResponse discoverRecentMovies(int page, LocalDate sinceDate) {
+        String sinceParam = sinceDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        log.info("Discovering recent movies from TMDb (release_date.gte={}), page={}", sinceParam, page);
+
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/discover/movie")
+                        .queryParam("api_key", apiKey)
+                        .queryParam("sort_by", "popularity.desc")
+                        .queryParam("release_date.gte", sinceParam)
                         .queryParam("page", page)
                         .queryParam("language", "en-US")
                         .build()
