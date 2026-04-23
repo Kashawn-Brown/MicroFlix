@@ -1,8 +1,29 @@
 # MicroFlix
 
-MicroFlix is a microservices-based movie platform I’m building to practice **production-minded backend development** and full-stack integration.
+MicroFlix is a microservices-based movie platform I built as deliberate practice in production-style backend architecture — Java, Spring Boot 3, Spring Cloud, real service boundaries, gateway routing, distributed authentication. The product is a movie catalog with per-user ratings and watchlists, backed by TMDb. The product gives the project a real domain to work in, but the architecture is what the project is actually about.
 
-The system is split into small Spring Boot services (users, movies, ratings) behind a Spring Cloud Gateway, with a Next.js frontend on top and a Docker / AWS EC2 deployment that feels close to a real-world setup.
+The system is split into separate Spring Boot services (users, movies, ratings, plus a one-shot TMDb ingestion job) behind a Spring Cloud Gateway, with a Next.js frontend on top and a Docker / AWS EC2 deployment that mirrors a real-world setup.
+
+---
+
+## Project status
+
+The project was deployed to AWS EC2 with a real CI/CD pipeline through GitHub Actions. The deployment is currently retired — the always-on cost of running multiple JVMs and three Postgres instances on managed AWS doesn't make sense for a portfolio project with no real users. Everything in this README that describes the deployment reflects what was actually built and ran in production; you can also bring the full stack up locally with the instructions below.
+
+---
+
+## What this project demonstrates
+
+This was built as deliberate practice, not as a product. What it demonstrates is end-to-end work on a real distributed backend system:
+
+- Designing service boundaries along genuine data ownership lines (users, movies, ratings)
+- Cross-service authentication via JWTs verified independently per service, no central auth round-trip
+- API gateway with routing and parallel aggregation across multiple downstream services
+- One database per data-owning service, coordinated via Docker Compose
+- Standardized error handling across services using RFC 7807 `ProblemDetail`
+- Multi-stage Docker builds, Docker Compose orchestration with separate dev and prod overrides
+- Real CI/CD through GitHub Actions — CI builds and pushes images, CD pulls and deploys, with explicit ordering between them
+- AWS EC2 deployment with real production debugging (browser/SSR/container networking, sizing, disk pressure)
 
 ---
 
@@ -36,13 +57,13 @@ The system is split into small Spring Boot services (users, movies, ratings) beh
 
 **Key technologies:**
 
-- Java 21, Spring Boot 3
+- Java 21, Spring Boot 3.5, Spring Cloud 2025
 - Spring Web, Spring Data JPA, Spring Security (JWT)
 - Spring Cloud Gateway + Eureka Discovery
 - PostgreSQL + Flyway migrations
-- Next.js (App Router), TypeScript, React 18, Tailwind CSS
+- Next.js (App Router), TypeScript, React 19, Tailwind CSS
 - Docker + Docker Compose
-- JUnit 5 + Mockito
+- JUnit 5, Mockito, Testcontainers
 - GitHub Actions for CI + EC2 deploy
 
 ---
@@ -63,24 +84,23 @@ From the root:
 ```bash
 cd docker
 docker compose up --build
-````
+```
 
 This brings up:
 
-* `discovery` (Eureka) on **[http://localhost:8761](http://localhost:8761)**
-* `gateway` on **[http://localhost:8081](http://localhost:8081)**
-* `user-service` on **[http://localhost:8082](http://localhost:8082)**
-* `movie-service` on **[http://localhost:8083](http://localhost:8083)**
-* `rating-service` on **[http://localhost:8084](http://localhost:8084)**
-* three Postgres instances (`user-db`, `movie-db`, `rating-db`)
-* `frontend` on **[http://localhost:80](http://localhost:80)** (or `http://localhost:3000` in dev-only setups)
+- `discovery` (Eureka) on **http://localhost:8761**
+- `gateway` on **http://localhost:8081**
+- `user-service` on **http://localhost:8082**
+- `movie-service` on **http://localhost:8083**
+- `rating-service` on **http://localhost:8084**
+- three Postgres instances (`user-db`, `movie-db`, `rating-db`)
+- `frontend` on **http://localhost:80** (or `http://localhost:3000` in dev-only setups)
 
 The frontend talks only to the **gateway**, not directly to the microservices.
 
 ### TMDb ingestion jobs (manual)
-The TMDb ingestion service is a **one-off job**, not a long-running API.
 
-You run it when you want to add or enrich movies.
+The TMDb ingestion service is a **one-off job**, not a long-running API. You run it when you want to add or enrich movies.
 
 From `docker/`:
 
@@ -96,10 +116,9 @@ docker compose --profile jobs run --rm tmdb-ingestion-service --count=50 --enric
 
 # Backfill runtimes for any existing movies missing runtime (generic enrichment)
 docker compose --profile jobs run --rm tmdb-ingestion-service --enrich-runtime --update-limit=200
-````
+```
 
-The `--count` flag controls how many new movies to insert (0 or missing means “use default” from config).
-The `--update-limit` flag controls how many movies to update in backfill mode.
+The `--count` flag controls how many new movies to insert (0 or missing means "use default" from config). The `--update-limit` flag controls how many movies to update in backfill mode.
 
 > **Note:** After changing code in `tmdb-ingestion-service`, run:
 >
@@ -125,24 +144,26 @@ Set `NEXT_PUBLIC_API_BASE_URL` to point at your gateway, e.g. `http://localhost:
 
 ## API & routing model
 
-From the **frontend’s perspective**, all API calls go through a `/gateway` prefix that Next.js rewrites to the gateway. For example:
+From the **frontend's perspective**, all API calls go through a `/gateway` prefix that Next.js rewrites to the gateway. For example:
 
-* Browser calls:
+- Browser calls:
   `GET /gateway/movie-service/api/v1/movies?query=inception`
-* Next.js rewrites this to:
+- Next.js rewrites this to:
   `GET ${GATEWAY_BASE_URL}/movie-service/api/v1/movies?query=inception`
+
+The reason for this proxy pattern is that Docker container hostnames don't resolve in a real user's browser — `gateway` only exists inside the Docker network. The frontend uses relative paths, Next.js handles the rewrite server-side, and the API client itself is environment-aware (different URL strategies for browser vs server-side rendering).
 
 Inside the **gateway**, routes forward to the microservices:
 
-* `/user-service/**` → `user-service`
-* `/movie-service/**` → `movie-service`
-* `/rating-service/**` → `rating-service`
+- `/user-service/**` → `user-service`
+- `/movie-service/**` → `movie-service`
+- `/rating-service/**` → `rating-service`
 
 ### Aggregated catalog endpoint
 
 The gateway also exposes an **aggregation endpoint** used by the movie-detail page:
 
-* `GET /api/v1/catalog/movies/{id}`
+- `GET /api/v1/catalog/movies/{id}`
 
 It returns a merged view of multiple services:
 
@@ -157,7 +178,19 @@ It returns a merged view of multiple services:
 }
 ```
 
-Internally the gateway uses a load-balanced `WebClient` to call `movie-service` and `rating-service`, forwarding the `Authorization` header so downstream services can resolve the current user.
+Internally the gateway uses a load-balanced `WebClient` to call `movie-service` and `rating-service` in parallel via `Mono.zip`, forwarding the `Authorization` header so downstream services can resolve the current user. The aggregation lives at the gateway rather than inside any one service so the service boundaries stay clean — `movie-service` doesn't know about ratings, `rating-service` doesn't know about movies.
+
+---
+
+## Authentication
+
+Authentication runs through stateless JWTs:
+
+- `user-service` issues tokens on login, signs them with a shared secret, and embeds the user's email, roles, and ID in the claims.
+- Each downstream service verifies the token locally using the same secret — no round-trip back to `user-service` to validate.
+- Read endpoints (browsing the catalog, viewing aggregate ratings) are public; write endpoints require a valid token.
+
+The local-verification approach was chosen over a shared auth module to keep services genuinely independent of each other. At three services, the duplication is trivially manageable; at larger scale it would make sense to extract a shared library.
 
 ---
 
@@ -167,150 +200,115 @@ Each **core microservice** (`user-service`, `movie-service`, `rating-service`) e
 
 ### Health (Spring Boot Actuator)
 
-* `GET /actuator/health` → returns `{ "status": "UP" }` when the service is healthy.
+- `GET /actuator/health` → returns `{ "status": "UP" }` when the service is healthy.
 
 Locally (via exposed ports):
 
-* User-service: `http://localhost:8082/actuator/health`
-* Movie-service: `http://localhost:8083/actuator/health`
-* Rating-service: `http://localhost:8084/actuator/health`
+- User-service: `http://localhost:8082/actuator/health`
+- Movie-service: `http://localhost:8083/actuator/health`
+- Rating-service: `http://localhost:8084/actuator/health`
 
-In production (AWS EC2), these endpoints are reachable **inside the Docker network** only and are meant for future load balancers / monitoring, not public access.
+In production these endpoints sat inside the Docker network only and were intended for future load balancers / monitoring rather than public access.
 
 ### OpenAPI / Swagger UI (springdoc-openapi)
 
-* JSON docs: `GET /v3/api-docs`
-* UI: `GET /swagger-ui/index.html`
+- JSON docs: `GET /v3/api-docs`
+- UI: `GET /swagger-ui/index.html`
 
 Examples (local):
 
-* `http://localhost:8082/swagger-ui/index.html` (user-service)
-* `http://localhost:8083/swagger-ui/index.html` (movie-service)
-* `http://localhost:8084/swagger-ui/index.html` (rating-service)
+- `http://localhost:8082/swagger-ui/index.html` (user-service)
+- `http://localhost:8083/swagger-ui/index.html` (movie-service)
+- `http://localhost:8084/swagger-ui/index.html` (rating-service)
 
-Swagger is mainly for development and debugging; in production it remains accessible on the internal network.
+Swagger is mainly for development and debugging.
 
 ---
 
 ## Error handling
 
-All services use Spring’s `ProblemDetail` to implement **RFC 7807 problem+json** error responses:
+All services use Spring's `ProblemDetail` to implement **RFC 7807 problem+json** error responses:
 
-* Domain errors (e.g., movie not found, rating not found) → **404** with a clear title.
-* Bad input / validation errors → **400**, with a field error map when using `@Valid`.
-* Generic unexpected errors → **500** with a safe, generic message.
+- Domain errors (e.g., movie not found, rating not found) → **404** with a clear title.
+- Bad input / validation errors → **400**, with a field error map when using `@Valid`.
+- Generic unexpected errors → **500** with a safe, generic message.
 
-The gateway’s aggregation endpoint:
+The gateway's aggregation endpoint:
 
-* Treats “no data yet” situations (e.g., no ratings, not in watchlist) as **empty defaults**.
-* For real downstream errors, it **passes through** the microservice’s `ProblemDetail` JSON (status + body) so the frontend sees a consistent error format regardless of whether it calls a single service or the aggregated catalog endpoint.
+- Treats "no data yet" situations (e.g., no ratings, not in watchlist) as **empty defaults**.
+- For real downstream errors, it **passes through** the microservice's `ProblemDetail` JSON (status + body) so the frontend sees a consistent error format regardless of whether it calls a single service or the aggregated catalog endpoint.
 
 ---
 
 ## Deployment (AWS EC2 + CI/CD)
 
-MicroFlix is deployed to an **AWS EC2** instance running Docker and Docker Compose:
+MicroFlix was deployed to an **AWS EC2** instance running Docker and Docker Compose. The deployment is currently retired (see Project Status above), but everything below describes what was actually running.
 
-* An EC2 `t3.medium` hosts the full stack (discovery, gateway, services, Postgres, frontend).
-* The stack is started with a production compose file:
+The full stack ran on a `t3.medium` instance (`t3.micro` was attempted first but the combined memory footprint of multiple Spring Boot services plus three Postgres instances pushed it over). The stack was started with a production compose file:
 
-  * only the **frontend (port 80)** is exposed publicly;
-  * microservices and databases stay on the internal Docker network.
+- only the **frontend (port 80)** was exposed publicly
+- microservices and databases stayed on the internal Docker network
 
 ### Running the TMDb ingestion job in production
 
-On EC2, the ingestion job is also run as a one-off container.  
-From the `docker` directory on the EC2 instance:
+On EC2, the ingestion job was run as a one-off container. From the `docker` directory on the EC2 instance:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
   --profile jobs run --rm tmdb-ingestion-service --count=50
-````
+```
 
-This reuses the existing production stack configuration (`docker-compose.yml` + `docker-compose.prod.yml`), starts the job container with access to `movie-service` and the movie database, inserts new TMDb movies, and then exits. You can trigger this manually or later wire it into a cron job or scheduled GitHub Action.
+This reused the existing production stack configuration, started the job container with access to `movie-service` and the movie database, inserted new TMDb movies, and exited. It could be triggered manually or wired into a cron job or scheduled GitHub Action.
 
-> **Note:** After changing `tmdb-ingestion-service` code and deploying to EC2, rebuild
-> the ingestion image before running the job:
+> **Note:** After changing `tmdb-ingestion-service` code and deploying to EC2, rebuild the ingestion image before running the job:
 >
 > ```bash
 > docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
 >   --profile jobs build tmdb-ingestion-service
 > ```
->
-> Then run:
->
-> ```bash
-> docker-compose -f docker-compose.yml -f docker-compose.prod.yml \
->   --profile jobs run --rm tmdb-ingestion-service --count=50
-> ```
-> 
 
 ### GitHub Actions
 
-Two main workflows:
+Two workflows kept the project building and deploying:
 
-* **CI** (`.github/workflows/ci.yml`)
+**CI** (`.github/workflows/ci.yml`)
 
-  * Runs on push/PR to `main`.
-  * Builds and tests backend (`mvn clean test`) and frontend (`npm ci && npm run build`).
+- Ran on pushes and pull requests.
+- Always:
+  - Built and tested the backend (`mvn -B clean test` from the repo root).
+  - Built the frontend (`npm ci && npm run build` in `frontend/`).
+- On pushes to `main`:
+  - Also built Docker images for all services (discovery, gateway, user-service, movie-service, rating-service, tmdb-ingestion, frontend).
+  - Pushed them to Docker Hub under `kbrown2428/microflix-*` tagged `:latest`.
 
-* **Deploy to EC2** (`.github/workflows/deploy-ec2.yml`)
+**Deploy to EC2** (`.github/workflows/cd.yml`)
 
-  * Runs on push to `main` (and manual `workflow_dispatch`).
-  * SSHes into EC2 using GitHub secrets.
-  * Pulls latest code and runs:
+- Triggered automatically via `workflow_run` **after the CI workflow completed successfully on `main`**, with manual `workflow_dispatch` as a backup.
+- SSHed into the EC2 instance using GitHub secrets (`EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`).
+- On the server:
+  - Pruned old unused Docker artifacts.
+  - Pulled the latest code (`git fetch` + `git reset --hard origin/main`).
+  - Pulled the newest container images and restarted the stack:
 
     ```bash
-    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+    cd /opt/MicroFlix/docker
+    IMAGE_TAG=latest docker-compose pull
+    IMAGE_TAG=latest docker-compose up -d
     ```
-  * Rebuilds and restarts containers in place.
 
-Branch protection rules require the CI checks to pass before merging into `main`, so only healthy builds are deployed.
+EC2 itself never built images — it only pulled and ran the ones built by CI. The reason CD waits for CI rather than triggering directly off the same `push` event was a real production debugging story: the original setup had both workflows triggered by the same push, and the first deploy failed because EC2 tried to pull images that CI hadn't finished pushing yet. Treating "deploy from main" as one operation when it was actually two coordinated operations was the mistake. The `workflow_run` trigger codified the ordering that should always have been there.
 
----
-
-### GitHub Actions
-
-Two main workflows keep MicroFlix healthy and deployed:
-
-* **CI** (`.github/workflows/ci.yml`)
-
-  * Runs on pushes and pull requests.
-  * Always:
-    * Builds and tests the backend (`mvn -B clean test` from the repo root).
-    * Builds the frontend (`npm ci && npm run build` in `frontend/`).
-  * On pushes to `main`:
-    * Also builds Docker images for all services (discovery, gateway, user-service, movie-service, rating-service, tmdb-ingestion, frontend).
-    * Pushes them to Docker Hub under `kbrown2428/microflix-*` tagged `:latest`.
-
-* **Deploy to EC2** (`.github/workflows/cd.yml`)
-
-  * Triggered automatically via `workflow_run` **after the CI workflow completes successfully on `main`**, and can also be started manually with `workflow_dispatch`.
-  * SSHes into the EC2 instance using GitHub secrets (`EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`).
-  * On the server it:
-    * Prunes old unused Docker artifacts (safe-ish cleanup).
-    * Pulls the latest code (`git fetch` + `git reset --hard origin/main`).
-    * Pulls the newest container images and restarts the stack:
-
-      ```bash
-      cd /opt/MicroFlix/docker
-      IMAGE_TAG=latest docker-compose pull
-      IMAGE_TAG=latest docker-compose up -d
-      ```
-
-    * EC2 never builds images; it only pulls and runs the ones built by CI.
-
-Branch protection rules require the CI checks to pass before merging into `main`, and the deploy workflow only runs after a successful CI run, so only healthy builds are deployed.
+Branch protection rules required the CI checks to pass before merging into `main`, and the deploy workflow only ran after a successful CI run.
 
 ---
 
 ## Where to look next
 
-* `modules/user-service/README.md` – auth, profile, and error handling.
-* `modules/movie-service/README.md` – search, genres, TMDb seeding, and indexing.
-* `modules/tmdb-ingestion-service/README.md` – TMDb seeding + enrichment job and how to run it.
-* `modules/rating-service/README.md` – ratings, watchlist, and engagement model.
-* `modules/gateway/README.md` – routes and aggregated catalog endpoints.
-* `frontend/README.md` – Next.js UI and how it talks to the gateway.
+- `modules/user-service/README.md` – auth, profile, and error handling.
+- `modules/movie-service/README.md` – search, genres, TMDb seeding, and indexing.
+- `modules/tmdb-ingestion-service/README.md` – TMDb seeding + enrichment job and how to run it.
+- `modules/rating-service/README.md` – ratings, watchlist, and engagement model.
+- `modules/gateway/README.md` – routes and aggregated catalog endpoints.
+- `frontend/README.md` – Next.js UI and how it talks to the gateway.
 
 ---
