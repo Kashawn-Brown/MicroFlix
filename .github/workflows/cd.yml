@@ -1,15 +1,21 @@
 name: Deploy to EC2
 
-on:
-  # Run automatically when the CI workflow finishes on main
-  workflow_run:
-    workflows: [ "CI" ]
-    branches: [ main ]
-    types:
-      - completed
+# DISABLED: EC2 deployment is retired. All triggers are commented out so this
+# workflow cannot fire (a successful CI run would otherwise launch a deploy
+# attempt against infrastructure that no longer exists). The job definition
+# below is intentionally preserved as documentation of what the deploy looked
+# like. Do not re-enable without provisioning new target infrastructure first.
 
-  # Allow manual trigger from the Actions tab
-  workflow_dispatch:
+# on:
+#   # Run automatically when the CI workflow finishes on main
+#   workflow_run:
+#     workflows: [ "CI" ]
+#     branches: [ main ]
+#     types:
+#       - completed
+#
+#   # Allow manual trigger from the Actions tab
+#   workflow_dispatch:
 
 jobs:
   deploy:
