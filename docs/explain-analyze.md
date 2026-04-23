@@ -578,7 +578,70 @@ Execution Time: 1.944 ms
 
 **Net result:** 11 of 12 hot-query plans now optimal or near-optimal. The remaining gap (Q5 title sort) is documented and deferred with a clear threshold for revisit. Q2 SELECT's composite-index opportunity is documented and deferred for the same reason.
 
-**Additional follow-ups surfaced by this analysis** (consider adding to `docs/future-work.md`):
-- Promote `tmdb_id` to UNIQUE constraint (semantically correct; index would come for free; deferred as larger lift orthogonal to the perf goal).
-- Composite `(release_year, created_at DESC)` for Q2 SELECT — only if year-filtered browsing becomes a measured hot path.
-- `idx_movies_title (title)` btree for title sort — revisit at ~50k catalog or if Branch 3 k6 measurements show title sort hot.
+## Indexes considered — one added, two rejected
+
+After post-V5 measurement, three additional indexes were on the table. Engineering judgment was applied to each. Adding indexes you don't need is a real cost: every index slows down INSERTs and UPDATEs, and our ingestion path runs INSERTs in volume. The right move is to add the one index that gives a clear semantic + performance win, and explicitly reject the two that don't.
+
+### Added — `tmdb_id` promoted to UNIQUE constraint (V6)
+
+V5 added `idx_movies_tmdb_id` as a plain btree. Post-V5 measurement confirmed it solved the read-side problem (Q7/Q8 went from 226-buffer Seq Scans to 2–3-buffer Index Scans). But the data is functionally unique today — the ingestion path's `existsByTmdbId` check enforces it at the application layer — and the `Movie` JPA entity already declares `unique = true` on the column. The DB schema didn't reflect that claim.
+
+Promoting to a UNIQUE constraint:
+- Catches any future integrity bug (a duplicate insert from a code path that bypasses the existence check) at the DB layer instead of as a corrupted catalog.
+- Costs nothing on the read side — the constraint's backing index serves Q7/Q8 identically (verified below).
+- Replaces, not adds — the old plain index is dropped in the same migration so we don't end up with two indexes on the same column.
+
+Migration `V6__promote_tmdb_id_to_unique.sql`:
+
+```sql
+ALTER TABLE movies
+    ADD CONSTRAINT uk_movies_tmdb_id UNIQUE (tmdb_id);
+
+DROP INDEX idx_movies_tmdb_id;
+```
+
+Pre-flight check confirmed zero duplicate `tmdb_id` rows and zero nulls in the 3747-movie catalog before applying. (Column left nullable to allow non-TMDb-sourced movies in the future, matching the JPA entity. Postgres treats multiple NULLs as distinct under default `NULLS DISTINCT`.)
+
+### Post-V6 measurements — Q7/Q8 unchanged with UNIQUE-backed index
+
+| Query | Post-V5 (`idx_movies_tmdb_id`) | Post-V6 (`uk_movies_tmdb_id`) | Plan |
+|---|---|---|---|
+| Q7 existsByTmdbId | 0.127 ms / 6 buf | 0.071 ms / 6 buf | Index Only Scan (same) |
+| Q8 findByTmdbId hit | 0.043 ms / 3 buf | 0.016 ms / 3 buf | Index Scan (same) |
+| Q8 findByTmdbId miss | 0.034 ms / 2 buf | 0.034 ms / 2 buf | Index Scan (same) |
+
+Identical plans, identical buffer counts; wall-clock variance within run-to-run noise. The UNIQUE constraint's backing index is a btree on `(tmdb_id)`, structurally the same as V5's plain index, so the planner makes the same choices.
+
+### Rejected — composite `(release_year, created_at DESC)` for Q2 SELECT
+
+Q2 SELECT (`?year=NNNN&page=0&size=12`) currently uses V4's sort index and filters inline, removing 577 rows to find the first 12 matches. A composite `(release_year, created_at DESC)` would let the planner skip both the filter step and the sort, going directly to the right rows.
+
+**Why not added:** Q2 SELECT already executes in 0.25 ms. The composite index would shave a fraction of a millisecond off a query that's not a problem, while imposing a real write cost on every INSERT (every ingested movie updates one more index). At the catalog size where year-filtered browsing becomes a measured hot path, the trade flips. Until then, no.
+
+### Rejected — `idx_movies_title (title)` btree for title sort
+
+Q5 title sort currently does a Seq Scan + top-N heapsort over 3747 rows in ~2 ms. A `(title)` btree would replace this with an Index Scan and bring it sub-millisecond.
+
+**Why not added:** Title sort is a *user-initiated* sort change (the default is `created_desc`), not hit on every page load. ~2 ms isn't pain. Adding the index would slow every INSERT and UPDATE on the table for negligible read gain. Same logic as Q2: revisit when measurement justifies it (catalog growth past ~50k movies, or k6 hot-path signal from Branch 3).
+
+---
+
+## Final coverage map (V4 + V5 + V6)
+
+| Query | Plan | Status |
+|---|---|---|
+| Q1 default browse SELECT | Index Scan idx_movies_created_at_id | ✅ V4 |
+| Q1 default browse COUNT | Index Only Scan PK | ✅ optimal |
+| Q2 year filter SELECT | Index Scan sort + filter | ✅ acceptable (0.25 ms; composite index rejected) |
+| Q2 year filter COUNT | Bitmap idx_movies_release_year | ✅ V4 |
+| Q3 genre filter SELECT | Nested Loop via idx_movies_created_at_id + uk_movie_genre | ✅ V4 + UNIQUE |
+| Q3 genre filter COUNT | Merge Join + idx_movie_genres_genre_movie | ✅ V4 |
+| Q4 title ILIKE SELECT | Index Scan sort + trigram-aware filter (or trigram bitmap when selective) | ✅ V5 |
+| Q4 title ILIKE COUNT | Bitmap idx_movies_title_trgm | ✅ V5 |
+| Q5 title sort | Seq Scan + top-N heapsort | ✅ acceptable (~2 ms; title btree rejected) |
+| Q5 year sort | Index Scan Backward idx_movies_release_year | ✅ V4 |
+| Q6 PK lookup | Index Scan movies_pkey | ✅ optimal |
+| Q7 existsByTmdbId | Index Only Scan uk_movies_tmdb_id | ✅ V5 → V6 |
+| Q8 findByTmdbId | Index Scan uk_movies_tmdb_id | ✅ V5 → V6 |
+
+All 12 hot-query plans are now either optimal or deliberately accepted as good-enough with the trade documented. No "todo" indexes hanging over the catalog.
