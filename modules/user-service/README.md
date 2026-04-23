@@ -87,7 +87,7 @@ All error responses use the same basic shape (status, title, detail) so the fron
 * Health:
 
   * `GET /actuator/health` → `{ "status": "UP" }`
-* Prometheus metrics scrape (HTTP server, JVM, HikariCP pool):
+* Prometheus metrics scrape (HTTP server with latency histograms, JVM, HikariCP pool):
 
   * `GET /actuator/prometheus`
 * OpenAPI JSON:
@@ -98,5 +98,7 @@ All error responses use the same basic shape (status, title, detail) so the fron
   * `GET /swagger-ui/index.html`
 
 These endpoints are accessible on `http://localhost:8082` when running locally. In production they’re reachable on the internal network (not exposed directly to the internet).
+
+This service appears in the **MicroFlix Overview** Grafana dashboard at `http://localhost:3001` (request rate, latency percentiles, status codes, JVM heap, HikariCP).
 
 ---

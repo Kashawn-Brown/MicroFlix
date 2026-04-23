@@ -124,7 +124,7 @@ All errors are returned as `application/problem+json` so the frontend can treat 
 * Health:
 
   * `GET /actuator/health`
-* Prometheus metrics scrape (HTTP server, JVM, HikariCP pool):
+* Prometheus metrics scrape (HTTP server with latency histograms, JVM, HikariCP pool):
 
   * `GET /actuator/prometheus`
 * OpenAPI JSON:
@@ -136,6 +136,8 @@ All errors are returned as `application/problem+json` so the frontend can treat 
 
 Locally: `http://localhost:8083/swagger-ui/index.html`
 In production: available on the internal network for debugging and documentation.
+
+This service appears in the **MicroFlix Overview** Grafana dashboard at `http://localhost:3001` (request rate, latency percentiles, status codes, JVM heap, HikariCP).
 
 ---
 
