@@ -6,14 +6,14 @@ All measurements taken against the live compose stack after the Branch 2 merge. 
 
 ---
 
-## Framing — why these two pages
+## Framing — what this branch did
 
-Two frontend pages drive meaningfully more per-page HTTP traffic than a single fetch, and both have plausible aggregation targets at the gateway:
+Two frontend pages had aggregation-friendly request shapes worth measuring:
 
-1. **Watchlist** (`app/watchlist/page.tsx`) — true 1+N. One fetch for the engagement list, then `Promise.all(engagements.map(fetchMovieById))` to hydrate each row with movie metadata. Fans across two services (rating-service → movie-service).
-2. **Movie detail** (`app/movies/[id]/page.tsx` + `components/movie-actions.tsx`) — 4 concurrent fetches when authed. `Promise.all` for movie + rating summary on the server, and `Promise.all` for my-rating + in-watchlist in the client `MovieActions` component. All four land at roughly the same wall-clock moment from the user's perspective.
+1. **Watchlist** (`app/watchlist/page.tsx`) — true 1+N. One fetch for the engagement list, then `Promise.all(engagements.map(fetchMovieById))` to hydrate each row with movie metadata. Fan-out across two services (rating-service → movie-service).
+2. **Movie detail** (`app/movies/[id]/page.tsx` + `components/movie-actions.tsx`) — 4 concurrent fetches when authed: movie + rating summary on the SSR side, my-rating + in-watchlist on the CSR side.
 
-The gateway already exposes `GET /api/v1/catalog/movies/{id}`, which fans out to movie-service and rating-service internally via `Mono.zip` and returns one response. Piece 2 will migrate the movie-detail page onto that endpoint and re-measure. The watchlist page doesn't have a matching aggregation endpoint yet — Piece 2 will decide whether to add one or take a different approach.
+Piece 1 captured median-of-3 baselines on the existing direct-downstream shape. Piece 2 migrated both pages onto gateway aggregation endpoints — the pre-existing `GET /api/v1/catalog/movies/{id}` for movie-detail, and a new `GET /api/v1/catalog/watchlist` for watchlist — then re-measured under the same load shape.
 
 ---
 
@@ -169,12 +169,14 @@ In local Docker where inter-container RTT is ~0.3 ms, the gateway hop doesn't bu
 
 The `http_reqs/sec` column is where the migration's value is already visible in these numbers: 80 req/sec → 40 req/sec at the same page-load rate means the client is generating half the gateway traffic per page view. That's capacity headroom — the same machine can serve twice as many page loads before it saturates anything.
 
-**Watchlist is slightly faster at the tail** (p95 16 ms → 14 ms, –12%) and **dramatically fewer requests** (60 req/sec → 5 req/sec, –91%).
+**Watchlist's real win is the request shape, not the latency number.** The migration collapsed 12 client-initiated requests per page load (1 engagements + 11 movie fetches) into 1, and eliminated the structural `engagement fetch → movie fan-out` sequential round-trip that no amount of browser-side parallelism could avoid. That's an architectural change that holds up on any network — it isn't contingent on the gateway hop being cheap.
 
-- Baseline has a sequential engagement fetch (~3 ms) followed by an 11-way parallel fan-out whose tail is bounded by the slowest of 11 — more parallel fetches mean a wider tail. Total p95 was 16 ms.
-- Aggregated collapses both steps into one call that does the fan-out reactively on the gateway (2 downstream: engagements + movie-batch). The per-request latency is higher (~10 ms vs ~3 ms) because it's doing more work per request, but the *page_load* number — which is what the user feels — came down because we cut the sequential engagement→movies gap that the baseline couldn't avoid.
+Latency tracked the shape change: p95 16 ms → 14 ms (–12%), driven by the sequential gap going away. The delta is modest in local Docker because inter-container RTT is already ~0.3 ms; on a real network where client→server RTT is tens of ms, that same sequential gap would have been the dominant cost and the delta would widen sharply.
 
-The watchlist wins here were real even in local Docker: the baseline's "1 sequential + N parallel" shape had a structural round-trip that the aggregation eliminates, independent of network cost.
+Per-request latency went *up* — http_req p50 3.27 ms → 10.09 ms, p95 4.97 ms → 13.86 ms — because each aggregated request is doing more work: fanning out to two services and joining the results. That's the right shape; we're paying once, on the gateway, for coordination the client used to do. The only number that matters to the user is `page_load`, which improved.
+
+- Baseline: sequential engagement fetch (~3 ms) followed by an 11-way parallel fan-out whose tail is bounded by the slowest of 11 — more parallel fetches mean a wider tail.
+- Aggregated: one call that does the fan-out reactively on the gateway (2 downstream: engagements + movie-batch). Per-request latency is higher by design; `page_load` came down because the sequential gap is gone.
 
 ### Methodology — `http.batch` over-models browser parallelism
 

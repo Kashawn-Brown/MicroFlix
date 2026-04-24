@@ -67,8 +67,13 @@ docker run --rm --network=docker_default \
   grafana/k6 run /scripts/scenarios/movie-detail-aggregated.js
 ```
 
-Add `--summary-export=/scripts/results/<scenario>-run<N>.json` to save a
-summary JSON per run — `docs/benchmarks.md` tables are read from those files.
+Add `--summary-export=/scripts/results/<scenario>-run<N>.json` to save a summary
+JSON per run. The `k6/results/` directory is gitignored — those JSONs are
+local-only artifacts the run author captures to read the medians out of.
+`docs/benchmarks.md` tables are the canonical record of the numbers that went
+into the writeup; re-running the scripts will produce your own JSONs in that
+directory on your machine.
+
 On Windows Git Bash, prefix the docker command with `MSYS_NO_PATHCONV=1` so
 the `/scripts/...` paths don't get mangled into `C:/Program Files/Git/scripts`.
 
