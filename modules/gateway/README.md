@@ -27,17 +27,17 @@ Example from the browser:
 - Browser: `GET /gateway/movie-service/api/v1/movies?query=inception`
 - Next.js rewrite: `GET ${GATEWAY_BASE_URL}/movie-service/api/v1/movies?query=inception`
 
-### Aggregated catalog endpoint
+### Aggregated catalog endpoints
 
-The gateway also exposes a **catalog aggregation** endpoint for the movie-detail page:
+The gateway exposes two **catalog aggregation** endpoints that the frontend hits directly. Both live in `CatalogController` and are backed by `CatalogService` using a load-balanced `WebClient` over Eureka (`lb://...`). The `Authorization` header is **forwarded** to downstream services so they can resolve the current user using their existing auth logic.
 
-- `GET /api/v1/catalog/movies/{id}`
+#### Movie-detail aggregation — `GET /api/v1/catalog/movies/{id}`
 
-It returns a single JSON payload combining:
+Returns a single JSON payload combining:
 
 - Movie metadata from `movie-service`
 - Rating summary (average + count) from `rating-service`
-- The current user’s rating + watchlist flag from `rating-service`
+- The current user's rating + watchlist flag from `rating-service`
 
 Example shape:
 
@@ -61,16 +61,43 @@ Example shape:
     "inWatchlist": true
   }
 }
-````
+```
 
-Internally, a `CatalogService` uses a load-balanced `WebClient` to:
+Fans out in parallel via `Mono.zip`:
 
-* Call `lb://movie-service/api/v1/movies/{id}`
-* Call `lb://rating-service/api/v1/ratings/movie/{id}/summary`
-* Call `lb://rating-service/api/v1/ratings/movie/{id}/me`
-* Call `lb://rating-service/api/v1/engagements/watchlist/{id}/me`
+* `lb://movie-service/api/v1/movies/{id}`
+* `lb://rating-service/api/v1/ratings/movie/{id}/summary`
+* `lb://rating-service/api/v1/ratings/movie/{id}/me`
+* `lb://rating-service/api/v1/engagements/watchlist/{id}/me`
 
-If the incoming request has an `Authorization: Bearer <token>` header, it is **forwarded** to rating-service so it can resolve “me” using its existing auth logic.
+When no `Authorization` header is present, the `me` block is short-circuited server-side to `{ "rating": null, "inWatchlist": false }` without the two authed calls.
+
+#### Watchlist aggregation — `GET /api/v1/catalog/watchlist` (authed only)
+
+Returns the current user's watchlist already joined with movie metadata, sorted `addedAt` desc:
+
+```json
+[
+  {
+    "movie": {
+      "id": 123,
+      "title": "Inception",
+      "releaseYear": 2010,
+      "genres": ["Action", "Sci-Fi"],
+      "posterPath": "/some/poster.jpg",
+      "backdropPath": "/some/backdrop.jpg"
+    },
+    "addedAt": "2026-04-22T10:15:30Z"
+  }
+]
+```
+
+Fans out sequentially — it has to, since the second call depends on the first:
+
+1. `lb://rating-service/api/v1/engagements/watchlist` → list of engagement rows (`userId`, `movieId`, `addedAt`)
+2. `lb://movie-service/api/v1/movies/batch?ids=<comma-sep>` → hydrated movie metadata in one round-trip
+
+`CatalogService.joinWatchlist` zips the two by `movieId`, preserves the engagements' `addedAt` desc order, and **silently drops any engagement whose `movieId` no longer exists in movie-service** (stale engagement to a deleted movie). This replaces the pre-migration 1 + N browser-side fan-out with a single client request.
 
 ---
 
@@ -127,6 +154,12 @@ The gateway registers a Micrometer Prometheus registry and exposes Actuator on p
 Spring Cloud Gateway 2025.0.0 auto-emits route-level metrics with no extra config. HTTP request histogram buckets are enabled (`management.metrics.distribution.percentiles-histogram.http.server.requests: true`) so the **MicroFlix Overview** Grafana dashboard can compute p50 / p95 / p99 latency for the gateway alongside the downstream services.
 
 The `prometheus` container scrapes `gateway:8081/actuator/prometheus` every 15s.
+
+---
+
+## Load testing
+
+Both aggregation endpoints are the target of the Branch 3 frontend migration. Baseline (pre-migration, individual service endpoints from the frontend) and aggregated (post-migration, single catalog call) measurements are captured as median-of-3 runs in [`docs/benchmarks.md`](../../docs/benchmarks.md); load scripts in `k6/scenarios/` (`watchlist-{baseline,aggregated}.js`, `movie-detail-{baseline,aggregated}.js`).
 
 ---
 

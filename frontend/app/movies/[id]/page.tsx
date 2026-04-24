@@ -1,10 +1,12 @@
-// Client-side Movie Details page: loads movie + rating summary by id and shows a detailed view with error handling
+// Server-rendered Movie Details page: loads movie + rating summary via the gateway's
+// aggregation endpoint in one hit, then hands the authed per-user slice off to MovieActions (CSR).
 
 import type { Metadata, ResolvingMetadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { fetchMovieById, type Movie } from "../../../lib/movie-api";
-import {fetchRatingSummary, type RatingSummary,} from "../../../lib/rating-api";
+import type { Movie } from "../../../lib/movie-api";
+import type { RatingSummary } from "../../../lib/rating-api";
+import { fetchCatalogMovieDetails } from "../../../lib/catalog-api";
 import { ApiError } from "../../../lib/api-client";
 import MovieActions from "../../../components/movie-actions";
 
@@ -22,7 +24,9 @@ export async function generateMetadata(
   }
 
   try {
-    const movie = await fetchMovieById(movieId);
+    // Same endpoint the page body uses. Next.js dedups per-request fetches, so metadata
+    // + page rendering share a single network round-trip to the gateway.
+    const { movie } = await fetchCatalogMovieDetails(movieId);
 
     if (!movie) {
       return {
@@ -97,18 +101,16 @@ export default async function MovieDetailsPage({params,}: MovieDetailsPageProps)
   let errorMessage: string | null = null;
 
   try {
-    
-    // Ask for the movie and rating summary in parallel (wait for both to come back)
-    const [movieData, summaryData] = await Promise.all([
-      fetchMovieById(movieId),
-      fetchRatingSummary(movieId),
-    ]);
 
-    // Set the movie data and summary
-    movie = movieData;
-    ratingSummary = summaryData;
+    // One aggregate call instead of two parallel downstream fetches. The me section
+    // comes back as the anonymous view (no Authorization header from SSR); MovieActions
+    // fills it in on the client.
+    const details = await fetchCatalogMovieDetails(movieId);
 
-  } catch (error) { 
+    movie = details.movie;
+    ratingSummary = details.ratingSummary;
+
+  } catch (error) {
     if (error instanceof ApiError) {
       errorMessage =
         error.problem?.detail ||
@@ -135,13 +137,6 @@ export default async function MovieDetailsPage({params,}: MovieDetailsPageProps)
       </section>
     );
   }
-
-  // Retrive average ratings, and make sure it is presentable
-  const average =
-    ratingSummary && ratingSummary.average !== null
-      ? ratingSummary.average.toFixed(1)
-      : null;
-
 
   return (
     <section className="flex w-full flex-col gap-6">

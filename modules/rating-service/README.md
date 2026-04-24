@@ -15,15 +15,17 @@ It’s built with Spring Boot 3, Spring Data JPA, and PostgreSQL.
 ### Ratings
 
 - **Upsert rating** for the current user:
-  - `PUT /api/v1/ratings/movie/{movieId}/me`
-    - Body includes a rating value (1.0–10.0)
+  - `POST /api/v1/ratings` with body `{ "movieId": number, "rate": number }`
+    - `rate` is a value between 1.0 and 10.0 (0.1 increments)
     - Stored as `rating_times_ten` integer (10–100) to avoid floating-point issues
+    - Idempotent on `(userId, movieId)` — a second call with a new `rate` updates the existing row
 
-- **Get the current user’s rating**:
+- **Get the current user's rating for a specific movie**:
   - `GET /api/v1/ratings/movie/{movieId}/me`
 
-- **Delete the current user’s rating**:
-  - `DELETE /api/v1/ratings/movie/{movieId}/me`
+- **Delete the current user's rating for a specific movie**:
+  - `DELETE /api/v1/ratings/{movieId}`
+    - Path param is the **movieId**, not a rating id — the service resolves the row from `(currentUserId, movieId)`
 
 - **Rating summary for a movie**:
   - `GET /api/v1/ratings/movie/{movieId}/summary`
@@ -32,16 +34,16 @@ It’s built with Spring Boot 3, Spring Data JPA, and PostgreSQL.
 
 - **List all ratings for the current user**:
   - `GET /api/v1/ratings/me`
-    - Used by the “My ratings” page in the frontend
+    - Used by the "My ratings" page in the frontend
 
 ### Watchlist (engagements)
 
 A generic `Engagement` entity is used so more engagement types can be added later:
 
-- **Add to watchlist**:
-  - `POST /api/v1/engagements/watchlist/{movieId}`
-- **Remove from watchlist**:
-  - `DELETE /api/v1/engagements/watchlist/{movieId}`
+- **Add to watchlist** (idempotent):
+  - `PUT /api/v1/engagements/watchlist/{movieId}` → 204
+- **Remove from watchlist** (idempotent):
+  - `DELETE /api/v1/engagements/watchlist/{movieId}` → 204
 - **List watchlist items**:
   - `GET /api/v1/engagements/watchlist`
 - **Check if a movie is on watchlist**:
@@ -126,5 +128,11 @@ Locally: `http://localhost:8084/swagger-ui/index.html`
 In production: accessible from the internal network for debugging and documentation.
 
 This service appears in the **MicroFlix Overview** Grafana dashboard at `http://localhost:3001` (request rate, latency percentiles, status codes, JVM heap, HikariCP).
+
+---
+
+## Performance notes
+
+Rating-service is a participant in both gateway aggregation endpoints (`/api/v1/catalog/movies/{id}` and `/api/v1/catalog/watchlist`). The Branch 3 frontend migration replaces direct browser calls against `/ratings/movie/{id}/me`, `/ratings/movie/{id}/summary`, and the `/engagements/watchlist/*` paths with server-side fan-out from the gateway. Before/after page-load numbers, load scripts, and methodology live in [`docs/benchmarks.md`](../../docs/benchmarks.md).
 
 ---

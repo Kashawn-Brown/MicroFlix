@@ -6,17 +6,9 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { loadAuth, clearAuth } from "../lib/auth-storage";
-import {
-    deleteMyRating,
-    fetchMyRatingForMovie,
-    upsertMyRating,
-    type RatingResponse,
-} from "../lib/rating-api";
-import {
-    addToWatchlist,
-    fetchInWatchlist,
-    removeFromWatchlist,
-} from "../lib/engagement-api";
+import { deleteMyRating, upsertMyRating } from "../lib/rating-api";
+import { addToWatchlist, removeFromWatchlist } from "../lib/engagement-api";
+import { fetchCatalogMovieDetailsAuthed } from "../lib/catalog-api";
 import { ApiError } from "../lib/api-client";
 
 type MovieActionsProps = {
@@ -32,7 +24,9 @@ export default function MovieActions({ movieId }: MovieActionsProps) {
     const [token, setToken] = useState<string | null>(null);
     const [displayName, setDisplayName] = useState<string | null>(null);
 
-    const [rating, setRating] = useState<RatingResponse | null>(null);
+    // Just the rate value — MovieActions never needed the full RatingResponse record,
+    // and the aggregated /catalog/movies/{id} endpoint returns me.rating as number | null.
+    const [rating, setRating] = useState<number | null>(null);
     const [ratingInput, setRatingInput] = useState<string>("");
     const [editingRating, setEditingRating] = useState(false);
     const [inWatchlist, setInWatchlist] = useState(false);
@@ -78,17 +72,16 @@ export default function MovieActions({ movieId }: MovieActionsProps) {
             setErrorMessage(null);
 
             try {
-                // Fetch the user's rating for this movie + whether it's in their watchlist. (in parrallel)
-                const [myRating, inWatchlistFlag] = await Promise.all([
-                fetchMyRatingForMovie(movieId, token),
-                fetchInWatchlist(movieId, token),
-                ]);
+                // One authed aggregate call in place of the old parallel pair of
+                // fetchMyRatingForMovie + fetchInWatchlist. We only consume the me slice —
+                // movie metadata + ratingSummary were already rendered by SSR.
+                const { me } = await fetchCatalogMovieDetailsAuthed(movieId, token);
 
                 if (cancelled) return;
 
-                setRating(myRating);
-                setRatingInput(myRating ? myRating.rate.toFixed(1) : "");
-                setInWatchlist(inWatchlistFlag);
+                setRating(me.rating);
+                setRatingInput(me.rating !== null ? me.rating.toFixed(1) : "");
+                setInWatchlist(me.inWatchlist);
             } catch (error) {
                 if (cancelled) return;
 
@@ -145,7 +138,7 @@ export default function MovieActions({ movieId }: MovieActionsProps) {
 
         try {
             const updated = await upsertMyRating(movieId, value, token);
-            setRating(updated);
+            setRating(updated.rate);
             setRatingInput(updated.rate.toFixed(1));
             setEditingRating(false);
         } catch (error) {
@@ -284,7 +277,7 @@ export default function MovieActions({ movieId }: MovieActionsProps) {
                         <p className="text-xs text-slate-300">
                         You rated this{" "}
                         <span className="font-semibold">
-                            {rating.rate.toFixed(1)}
+                            {rating.toFixed(1)}
                         </span>
                         /10.
                         </p>

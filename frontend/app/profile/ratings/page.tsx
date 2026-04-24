@@ -79,12 +79,20 @@ export default function MyRatingsPage() {
         }
 
         // 2) Fetch movie details for each unique movieId.
+        //    allSettled rather than all: a rating whose movieId no longer resolves
+        //    (movie deleted, catalog reseeded) should be silently dropped by the
+        //    join step below, not reject the whole batch and blank out the page.
         const movieIds = Array.from(
           new Set(ratings.map((r) => r.movieId))
         );
-        const movies = await Promise.all(
+        const movieResults = await Promise.allSettled(
           movieIds.map((id) => fetchMovieById(id))
         );
+        const movies = movieResults
+          .filter(
+            (r): r is PromiseFulfilledResult<Movie> => r.status === "fulfilled"
+          )
+          .map((r) => r.value);
 
         if (cancelled) return;
 

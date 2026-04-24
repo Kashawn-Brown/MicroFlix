@@ -1,11 +1,18 @@
 package com.microflix.gateway.catalog;
 
 import com.microflix.gateway.catalog.dto.*;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Coordinates calls to downstream microservices to build aggregated catalog responses for the gateway.
@@ -103,5 +110,79 @@ public class CatalogService {
                         tuple.getT1(),    // rating (may be null)
                         tuple.getT2()     // inWatchlist
                 ));
+    }
+
+    /**
+     * Build the aggregated watchlist response.
+     *
+     * Two downstream calls, sequenced: rating-service for engagements, then movie-service's
+     * batch endpoint to hydrate those engagements in one query instead of fanning out N
+     * /{id} calls. Empty watchlist short-circuits without touching movie-service.
+     *
+     * Order preserved throughout: rating-service returns engagements in addedAt-desc order,
+     * and the join helper below rebuilds the response list in that same order — since the
+     * movie-service batch endpoint also preserves input-id order, we could rely on its
+     * response directly, but doing the Map-based join here is robust to any reordering and
+     * also drops engagements whose movie row has gone missing (stale engagement rows).
+     */
+    public Mono<List<CatalogWatchlistItemDto>> getWatchlist(String authHeader) {
+        WebClient client = webClientBuilder.build();
+
+        return fetchWatchlistEngagements(client, authHeader)
+                .flatMap(engagements -> {
+                    if (engagements.isEmpty()) {
+                        return Mono.just(List.<CatalogWatchlistItemDto>of());
+                    }
+                    List<Long> movieIds = engagements.stream().map(EngagementDto::movieId).toList();
+                    return fetchMoviesBatch(client, movieIds)
+                            .map(movies -> joinWatchlist(engagements, movies));
+                });
+    }
+
+    /**
+     * Fetch the current user's engagement rows from rating-service. Authorization header
+     * is required — rating-service resolves @AuthenticationPrincipal from it.
+     */
+    private Mono<List<EngagementDto>> fetchWatchlistEngagements(WebClient client, String authHeader) {
+        return client.get()
+                .uri("lb://rating-service/api/v1/engagements/watchlist")
+                .header(HttpHeaders.AUTHORIZATION, authHeader)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<EngagementDto>>() {});
+    }
+
+    /**
+     * Hydrate a list of movie ids via movie-service's batch endpoint in one round-trip.
+     */
+    private Mono<List<CatalogMovieDto>> fetchMoviesBatch(WebClient client, List<Long> movieIds) {
+        String idsCsv = movieIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        return client.get()
+                .uri("lb://movie-service/api/v1/movies/batch?ids={ids}", idsCsv)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<CatalogMovieDto>>() {});
+    }
+
+    /**
+     * Pure-function join: produce watchlist items in engagement order, dropping any whose
+     * movie row no longer exists. Extracted for unit-testability — this is the only piece
+     * of the watchlist aggregation that has non-trivial logic.
+     */
+    static List<CatalogWatchlistItemDto> joinWatchlist(
+            List<EngagementDto> engagements,
+            List<CatalogMovieDto> movies
+    ) {
+        Map<Long, CatalogMovieDto> byId = new HashMap<>(movies.size());
+        for (CatalogMovieDto movie : movies) {
+            byId.put(movie.id(), movie);
+        }
+
+        List<CatalogWatchlistItemDto> result = new ArrayList<>(engagements.size());
+        for (EngagementDto engagement : engagements) {
+            CatalogMovieDto movie = byId.get(engagement.movieId());
+            if (movie != null) {
+                result.add(new CatalogWatchlistItemDto(movie, engagement.addedAt()));
+            }
+        }
+        return result;
     }
 }

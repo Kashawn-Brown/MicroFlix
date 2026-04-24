@@ -46,7 +46,7 @@ This was built as deliberate practice, not as a product. What it demonstrates is
   Movie ratings (1–10 scale with 0.1 increments, stored as `rating_times_ten`) plus a watchlist feature via a generic `engagements` table.
 
 - `modules/gateway`  
-  Spring Cloud Gateway entrypoint. Routes traffic to the microservices and exposes **aggregated catalog endpoints** for the frontend (e.g. `/api/v1/catalog/movies/{id}`).
+  Spring Cloud Gateway entrypoint. Routes traffic to the microservices and exposes **aggregated catalog endpoints** for the frontend (`/api/v1/catalog/movies/{id}` for the movie-detail page and `/api/v1/catalog/watchlist` for the watchlist page).
 
 - `modules/discovery`  
   Eureka discovery server so services can find each other by name (`lb://user-service`, `lb://movie-service`, etc.).
@@ -170,13 +170,13 @@ Inside the **gateway**, routes forward to the microservices:
 - `/movie-service/**` → `movie-service`
 - `/rating-service/**` → `rating-service`
 
-### Aggregated catalog endpoint
+### Aggregated catalog endpoints
 
-The gateway also exposes an **aggregation endpoint** used by the movie-detail page:
+The gateway exposes two **aggregation endpoints** that collapse what used to be multi-request page loads into single calls. Both are hit by the frontend:
 
-- `GET /api/v1/catalog/movies/{id}`
+**Movie-detail page** — `GET /api/v1/catalog/movies/{id}`
 
-It returns a merged view of multiple services:
+Returns a merged view of one movie plus current-user context:
 
 ```json
 {
@@ -189,7 +189,22 @@ It returns a merged view of multiple services:
 }
 ```
 
-Internally the gateway uses a load-balanced `WebClient` to call `movie-service` and `rating-service` in parallel via `Mono.zip`, forwarding the `Authorization` header so downstream services can resolve the current user. The aggregation lives at the gateway rather than inside any one service so the service boundaries stay clean — `movie-service` doesn't know about ratings, `rating-service` doesn't know about movies.
+Fans out to `movie-service` (movie) and `rating-service` (summary + me-rating + me-watchlist) in parallel via `Mono.zip`. Anonymous requests short-circuit the `me` block server-side.
+
+**Watchlist page** — `GET /api/v1/catalog/watchlist` (authed only)
+
+Returns the current user's watchlist as a single list, already joined with movie metadata and sorted `addedAt` desc:
+
+```json
+[
+  { "movie": { ... }, "addedAt": "2026-04-22T10:15:30Z" },
+  ...
+]
+```
+
+Fans out to `rating-service` (watchlist engagements) then `movie-service` (`GET /api/v1/movies/batch?ids=...`) in a single downstream round-trip, replacing the old 1 + N browser-side fan-out.
+
+Both endpoints use a load-balanced `WebClient` over Eureka (`lb://movie-service`, `lb://rating-service`) and forward the `Authorization` header so downstream services can resolve the current user. The aggregation lives at the gateway rather than inside any one service so the service boundaries stay clean — `movie-service` doesn't know about ratings, `rating-service` doesn't know about movies.
 
 ---
 
@@ -341,5 +356,7 @@ Branch protection rules required the CI checks to pass before merging into `main
 - `modules/gateway/README.md` – routes and aggregated catalog endpoints.
 - `frontend/README.md` – Next.js UI and how it talks to the gateway.
 - `docs/explain-analyze.md` – measurement-driven index analysis: V4 baseline coverage, V5/V6 additions, and "considered but rejected" decisions.
+- `docs/benchmarks.md` – k6 load-test methodology and per-page-load before/after for watchlist (1+N → single aggregation call) and movie detail (4 concurrent fetches → 2 calls on the aggregation endpoint).
+- `k6/README.md` – how to run the load scenarios locally.
 
 ---
