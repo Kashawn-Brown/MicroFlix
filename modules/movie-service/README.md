@@ -15,6 +15,7 @@ It’s built with Spring Boot 3, Spring Data JPA, and PostgreSQL.
 
 - **Core movie data**
   - `GET /api/v1/movies/{id}` – get a single movie by id
+  - `GET /api/v1/movies/batch?ids=12,7,42` – get multiple movies in one call, returned in input-id order. Unknown ids are silently dropped. Capped at 50 ids per call (over-cap returns 400). Used by the gateway's watchlist aggregation endpoint to hydrate engagement rows without a per-movie fan-out.
 - **Search & browse**
   - `GET /api/v1/movies` – paginated search
     - `query` – free-text search on title
@@ -52,7 +53,7 @@ Responses are mapped to DTOs (e.g., `MovieResponse`) and include genres and post
     - `idx_movies_title_trgm` (pg_trgm GIN over `LOWER(title)`) for `?query=` substring search
   - **V6 — `tmdb_id` promoted to a UNIQUE constraint** (`uk_movies_tmdb_id`), replacing V5's plain index. Same read characteristics, but the integrity guarantee now lives in the DB instead of only in the ingestion job.
 
-The full measurement story — baseline plans, post-V5/V6 plans, and the indexes that were *considered but rejected* (composite year+created_at, plain title btree) because they'd add INSERT cost without matching read pain — lives in [`docs/explain-analyze.md`](../../docs/explain-analyze.md).
+The full measurement story — baseline plans, post-V5/V6 plans, and the indexes that were *considered but rejected* (composite year+created_at, plain title btree) because they'd add INSERT cost without matching read pain — lives in [`docs/explain-analyze.md`](../../docs/explain-analyze.md). Branch 3's k6 load tests exercise the HTTP endpoints that correspond to these hot query surfaces; see [`docs/benchmarks.md`](../../docs/benchmarks.md) for the before/after page-load numbers.
 
 ---
 ## TMDb integration

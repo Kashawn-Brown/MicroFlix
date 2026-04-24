@@ -100,7 +100,7 @@ Rough structure:
   Movie details page (poster/backdrop, title, year, overview, genres) plus rating summary and user actions.
 
 * `app/watchlist/page.tsx`
-  Client page that loads the current user’s watchlist via rating-service and displays it as a grid of movies.
+  Client page that loads the current user's watchlist in **one call** via the gateway's `/api/v1/catalog/watchlist` aggregation endpoint and displays it as a grid of movies.
 
 * `app/profile/page.tsx`
   Profile overview (basic user info + simple stats like count of ratings/watchlist items).
@@ -111,12 +111,13 @@ Rough structure:
 * `app/login/...`
   Combined login/register experience (using query param or toggle), wired to user-service auth endpoints.
 
-* `app/lib/`
+* `lib/`
 
   * `auth-storage.ts`: manages storing/loading/clearing auth info in `localStorage` and broadcasts an auth-changed event.
-  * `auth-header.tsx`: small client component that renders login/register links or “Welcome, <name> / Logout” in the header.
+  * `auth-header.tsx`: small client component that renders login/register links or "Welcome, <name> / Logout" in the header.
   * `api-client.ts`: low-level helper for `fetch` calls to the gateway, including `ApiError` wrapping.
-  * `movie-api.ts`, `rating-api.ts`, `engagement-api.ts`, `auth-api.ts`: typed wrappers around specific backend endpoints.
+  * `movie-api.ts`, `rating-api.ts`, `engagement-api.ts`, `auth-api.ts`: typed wrappers around individual-service endpoints.
+  * `catalog-api.ts`: typed wrappers around the **gateway's aggregated catalog endpoints** (`/api/v1/catalog/movies/{id}`, `/api/v1/catalog/watchlist`). The movie-detail and watchlist pages use these rather than the per-service helpers above.
 
 This is intentionally small and direct. Each page depends on the relevant API helpers instead of inlining fetch calls everywhere.
 
@@ -238,31 +239,23 @@ The page:
 
 ### 4. Movie details (`/movies/[id]`)
 
-The movie details page does a couple of things:
+The movie details page makes a **single server-side fetch** to the gateway's aggregation endpoint:
 
-* **Fetches one movie** via `GET /movie-service/api/v1/movies/{id}`.
-* Shows:
+* `GET /api/v1/catalog/movies/{id}` (no auth → anonymous SSR)
 
-  * Poster (or fallback if missing).
-  * Title + release year.
-  * Genres.
-  * Overview.
-* **Fetches rating summary** via the rating-service:
+This replaces what used to be two parallel server-side fetches (`movies/{id}` + `ratings/movie/{id}/summary`). The response combines movie metadata, rating summary, and an empty `me` block (since SSR has no token):
 
-  * `GET /rating-service/api/v1/ratings/movie/{movieId}/summary`
-  * This returns:
+* `movie` — id, title, year, overview, genres, poster/backdrop paths
+* `ratingSummary` — `average` (or `null` if no ratings) + `count`
+* `me` — always `{ rating: null, inWatchlist: false }` on the SSR pass
 
-    * `movieId`
-    * `average` (e.g. `8.1` or `null` if no ratings)
-    * `count` (number of ratings). 
-
-The UI renders something like:
+The UI renders summary like:
 
 > ⭐ 8.1 / 10 (based on 42 ratings)
 
-or a friendly “No ratings yet” message.
+or a friendly "No ratings yet" message.
 
-Below the summary, there’s a **MovieActions** client component for logged-in users.
+Below the summary, there's a **MovieActions** client component for logged-in users.
 
 ---
 
@@ -272,14 +265,11 @@ The movie actions component handles all interactive user-specific behavior for a
 
 On mount, if the user is logged in (token exists):
 
-1. It loads:
+1. It loads the user's **own rating for this movie** and **watchlist flag** in a **single authed call** to the same aggregation endpoint the page already used anonymously:
 
-   * The user’s **own rating for this movie** via a dedicated endpoint:
+   * `GET /api/v1/catalog/movies/{id}` with `Authorization: Bearer <token>`
 
-     * `GET /rating-service/api/v1/ratings/movie/{movieId}/me`
-   * Whether the movie is in the user’s **watchlist** via:
-
-     * `GET /engagements/watchlist/{movieId}/me` (returns a boolean).
+   Only the `me` block is consumed here — `movie` and `ratingSummary` came from the SSR fetch. Collapsing two CSR calls (my-rating + in-watchlist) into one means fewer round-trips, and the gateway short-circuits the `me` block internally when no token is present so the anonymous SSR call stays cheap.
 
 2. It then shows:
 
@@ -292,12 +282,12 @@ On mount, if the user is logged in (token exists):
      * Text explaining whether this movie **is / isn’t** on your watchlist.
      * A button to **Add to watchlist** or **Remove from watchlist**.
 
-**Rating endpoints used:**
+**Rating endpoints used (write path stays on rating-service directly — aggregation is read-only):**
 
 * **Upsert (create or update) rating:**
   `POST /rating-service/api/v1/ratings` with `{ "movieId": number, "rate": number }`.
 * **Delete rating:**
-  `DELETE /rating-service/api/v1/ratings/movie/{movieId}`.
+  `DELETE /rating-service/api/v1/ratings/{movieId}`.
 
 The frontend keeps the behavior:
 
@@ -326,16 +316,17 @@ If any of them return `401`, the component auto-clears auth and redirects to `/l
 The watchlist page is a client page that:
 
 * Reads auth from `localStorage` via `loadAuth()`.
-* If there’s **no token**, shows a “Sign in to view your watchlist” message with a link to `/login`.
+* If there's **no token**, shows a "Sign in to view your watchlist" message with a link to `/login`.
 * If logged in:
 
-  * Calls `GET /rating-service/api/v1/engagements/watchlist` with the JWT.
-  * For each engagement (`{ userId, movieId, type, addedAt }`), fetches the movie details from movie-service.
-  * Joins them into a list of movies-with-addedAt and displays them in a grid similar to the main Movies page.
-  * Each card includes:
+  * Makes a **single call** to `GET /api/v1/catalog/watchlist` with the JWT.
+  * The gateway returns a list of `{ movie, addedAt }` items already joined and sorted `addedAt` desc — no browser-side fan-out or sorting needed.
+  * Renders them in a grid similar to the main Movies page. Each card includes:
 
     * Poster, title, year, genres.
-    * A “Remove from watchlist” button that calls the DELETE endpoint and updates UI optimistically.
+    * A "Remove from watchlist" button that calls `DELETE /rating-service/api/v1/engagements/watchlist/{movieId}` directly (writes stay on rating-service) and updates UI optimistically.
+
+This replaces the pre-migration 1 + N shape (one `/engagements/watchlist` call plus one `/movies/{id}` per row).
 
 ---
 
@@ -360,6 +351,8 @@ To make the app feel more like a real account-based product, there’s a simple 
   1. Calls `GET /rating-service/api/v1/ratings/me` to get all ratings for the current user.
   2. For each distinct movieId, calls `fetchMovieById(movieId)` to get movie metadata.
   3. Joins them into an array of `{ rating, movie }` and shows them as cards.
+
+  The per-movie hydration uses `Promise.allSettled` rather than `Promise.all` so a single 404 (a rating whose movie has since been deleted from the catalog — rare but possible) gets silently dropped instead of failing the whole page. This page is intentionally not migrated onto a catalog aggregation endpoint yet; the orphan-drop behavior was the driver for keeping the per-row fetch shape.
 
 Each card includes:
 
@@ -424,7 +417,7 @@ The frontend is intentionally **MVP-sized** but already in a good place for a po
 * Has realistic flows: browsing, filtering, rating, and tracking movies.
 * Treats errors and auth expiry in a reasonably robust way.
 
-The watchlist and movie-detail pages are under performance measurement in Branch 3 — per-page-load baselines (watchlist's 1+N fan-out, movie-detail's 4-concurrent shape) are captured in `docs/benchmarks.md`, with load scripts in `k6/scenarios/`. Piece 2 will migrate movie-detail onto the gateway's existing `/api/v1/catalog/movies/{id}` aggregation endpoint and re-measure.
+The watchlist and movie-detail pages were migrated onto the gateway's aggregation endpoints (`/api/v1/catalog/watchlist`, `/api/v1/catalog/movies/{id}`) in Branch 3. Per-page-load before/after — request-count collapse, p95 latency deltas, load scripts, and the `http.batch` vs real-browser methodology caveat — lives in [`docs/benchmarks.md`](../../docs/benchmarks.md); k6 scripts in `k6/scenarios/`.
 
 Ideas for future iterations:
 
