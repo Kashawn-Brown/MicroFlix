@@ -341,5 +341,7 @@ Branch protection rules required the CI checks to pass before merging into `main
 - `modules/gateway/README.md` – routes and aggregated catalog endpoints.
 - `frontend/README.md` – Next.js UI and how it talks to the gateway.
 - `docs/explain-analyze.md` – measurement-driven index analysis: V4 baseline coverage, V5/V6 additions, and "considered but rejected" decisions.
+- `docs/benchmarks.md` – k6 load-test methodology and per-page-load baselines for watchlist (1+N) and movie detail (4 concurrent fetches); updated with before/after when Piece 2 lands.
+- `k6/README.md` – how to run the load scenarios locally.
 
 ---

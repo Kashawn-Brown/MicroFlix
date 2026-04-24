@@ -424,6 +424,8 @@ The frontend is intentionally **MVP-sized** but already in a good place for a po
 * Has realistic flows: browsing, filtering, rating, and tracking movies.
 * Treats errors and auth expiry in a reasonably robust way.
 
+The watchlist and movie-detail pages are under performance measurement in Branch 3 — per-page-load baselines (watchlist's 1+N fan-out, movie-detail's 4-concurrent shape) are captured in `docs/benchmarks.md`, with load scripts in `k6/scenarios/`. Piece 2 will migrate movie-detail onto the gateway's existing `/api/v1/catalog/movies/{id}` aggregation endpoint and re-measure.
+
 Ideas for future iterations:
 
 * Route guards / redirects for protected pages (e.g. auto-redirect `/watchlist` to `/login?from=watchlist` if not authed).

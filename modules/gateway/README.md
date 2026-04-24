@@ -130,4 +130,10 @@ The `prometheus` container scrapes `gateway:8081/actuator/prometheus` every 15s.
 
 ---
 
+## Load testing
+
+The aggregation endpoint is the target of the Piece 2 migration in the Branch 3 benchmarks. Baseline measurements (pre-migration, using the individual service endpoints from the frontend) and methodology live in `docs/benchmarks.md`; load scripts in `k6/scenarios/movie-detail-baseline.js`.
+
+---
+
 
