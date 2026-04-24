@@ -16,8 +16,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class MovieService {         // Encapsulates business logic for movie operations.
@@ -50,6 +53,47 @@ public class MovieService {         // Encapsulates business logic for movie ope
                 .orElseThrow(() -> new MovieNotFoundException(id));
 
         return toMovieResponse(movie);
+    }
+
+    /**
+     * Maximum number of ids accepted by {@link #getMoviesByIds(List)} in a single call.
+     * Keeps URL length bounded and prevents accidental very-large IN-lists.
+     */
+    public static final int MAX_BATCH_SIZE = 50;
+
+    /**
+     * Returns movies matching the given ids, in the exact order the ids were supplied.
+     *
+     * Non-obvious: {@code findAllById} runs a single {@code WHERE id IN (...)} query but does
+     * NOT preserve caller order — results come back in whatever order the DB produced them.
+     * Watchlist aggregation on the gateway depends on the frontend-facing ordering (engagements
+     * sorted by addedAt), so we rebuild the response list in input-id order here.
+     *
+     * Unknown ids are silently dropped; the caller sees a (possibly shorter) list of the ones
+     * that did resolve.
+     */
+    public List<MovieResponse> getMoviesByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        if (ids.size() > MAX_BATCH_SIZE) {
+            throw new IllegalArgumentException(
+                    "Batch size cannot exceed " + MAX_BATCH_SIZE + " (was " + ids.size() + ")");
+        }
+
+        Map<Long, Movie> byId = new HashMap<>();
+        for (Movie movie : movieRepository.findAllById(ids)) {
+            byId.put(movie.getId(), movie);
+        }
+
+        List<MovieResponse> ordered = new ArrayList<>(ids.size());
+        for (Long id : ids) {
+            Movie movie = byId.get(id);
+            if (movie != null) {
+                ordered.add(toMovieResponse(movie));
+            }
+        }
+        return ordered;
     }
 
     /**

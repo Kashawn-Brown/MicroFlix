@@ -44,6 +44,23 @@ public class MovieController {
     }
 
     /**
+     * Returns movies matching the given ids, in input-id order.
+     *
+     *   GET /api/v1/movies/batch?ids=12,7,42
+     *
+     * Unknown ids are silently dropped. Capped at {@link MovieService#MAX_BATCH_SIZE} ids
+     * per call. Used by the gateway's watchlist aggregation endpoint to hydrate engagement
+     * rows in a single round-trip instead of fanning out N /{id} calls.
+     */
+    @GetMapping("/batch")
+    public ResponseEntity<List<MovieResponse>> getMoviesByIds(@RequestParam List<Long> ids) {
+
+        var response = movieService.getMoviesByIds(ids);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Creates a new movie and returns it with HTTP 201.
      *
      * Now implemented in Internal Controller (only to be used by Tmdb ingestion service)
