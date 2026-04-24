@@ -1,10 +1,12 @@
 package com.microflix.gateway.catalog;
 
 import com.microflix.gateway.catalog.dto.CatalogMovieDetailsResponse;
+import com.microflix.gateway.catalog.dto.CatalogWatchlistItemDto;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 /**
  * Aggregated catalog endpoints exposed at the gateway.
@@ -37,6 +39,21 @@ public class CatalogController {
         var response = catalogService.getMovieDetails(id, authHeader);
 
         return response;
+    }
+
+    /**
+     * Get the current user's watchlist hydrated with movie metadata in one hit.
+     *
+     * Collapses the 1+N pattern the frontend uses today (one engagements fetch + one
+     * movie fetch per entry) into a single request. The Authorization header is required
+     * — rating-service resolves the current user from it.
+     */
+    @GetMapping("/watchlist")
+    public Mono<List<CatalogWatchlistItemDto>> getWatchlist(
+            @RequestHeader(name = HttpHeaders.AUTHORIZATION) String authHeader
+    ) {
+
+        return catalogService.getWatchlist(authHeader);
     }
 
 }
