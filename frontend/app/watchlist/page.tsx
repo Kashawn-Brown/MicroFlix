@@ -1,4 +1,5 @@
-// Client-side Watchlist page: loads user's watchlist + movie details and lets them remove items
+// Client-side Watchlist page: loads user's watchlist via the gateway's aggregation
+// endpoint (one call, already joined with movie metadata) and lets them remove items.
 
 "use client";
 
@@ -7,19 +8,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { loadAuth, clearAuth } from "../../lib/auth-storage";
+import { removeFromWatchlist } from "../../lib/engagement-api";
 import {
-  fetchWatchlist,
-  removeFromWatchlist,
-  type EngagementItem,
-} from "../../lib/engagement-api";
-import { fetchMovieById, type Movie } from "../../lib/movie-api";
+  fetchCatalogWatchlist,
+  type CatalogWatchlistItem,
+} from "../../lib/catalog-api";
 import { ApiError } from "../../lib/api-client";
-
-// Combined type to store 1 clean list of Watchlist entries
-type WatchlistEntry = {
-  movie: Movie;
-  addedAt: string;
-};
 
 export default function WatchlistPage() {
   const router = useRouter();
@@ -28,7 +22,7 @@ export default function WatchlistPage() {
   const [token, setToken] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
 
-  const [entries, setEntries] = useState<WatchlistEntry[]>([]);
+  const [entries, setEntries] = useState<CatalogWatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -57,30 +51,15 @@ export default function WatchlistPage() {
       setErrorMessage(null);
 
       try {
-        // Fetch users watchlist
-        const engagements: EngagementItem[] = await fetchWatchlist(token);
+        // One aggregated call: gateway fans out to rating-service (engagements)
+        // and movie-service (batch hydration) and returns the joined list
+        // already in addedAt-desc order. Empty watchlist short-circuits on the
+        // gateway without touching movie-service.
+        const items = await fetchCatalogWatchlist(token);
 
         if (cancelled) return;
 
-        if (engagements.length === 0) {
-          setEntries([]);
-          return;
-        }
-
-        // Fetch movie details for each watchlist item.
-        const movies: Movie[] = await Promise.all(
-          engagements.map((eng) => fetchMovieById(eng.movieId))
-        );
-
-        if (cancelled) return;
-
-        // Combine each engagement with its corresponding movie by index
-        const combined: WatchlistEntry[] = engagements.map((eng, index) => ({
-          movie: movies[index],
-          addedAt: eng.addedAt,
-        }));
-
-        setEntries(combined);
+        setEntries(items);
       } catch (error) {
         if (cancelled) return;
 
