@@ -109,7 +109,9 @@ Each k6 run showed up as a request-rate spike on the **MicroFlix Overview** dash
 
 This confirms the Branch 1 observability pipeline (Micrometer → Prometheus → Grafana) is wired correctly for k6-generated traffic — so the same dashboards are available for before/after comparison when Piece 2 lands.
 
-Screenshot: *TODO — to be captured and filed under `docs/screenshots/dashboards/` during Piece 1 wrap.*
+![MicroFlix Overview dashboard during the watchlist baseline run, showing movie-service request rate running roughly 10× the rating-service rate — the 1+N fan-out visible directly on the per-service graph](screenshots/dashboards/watchlist-baseline-request-rate.png)
+
+*Per-service request rate on the MicroFlix Overview dashboard during a watchlist-baseline run. movie-service tracks ~10× rating-service, matching the 1+N shape (one engagements call + ten movie hydrations per iteration). End-to-end evidence that the Branch 1 observability pipeline picks up k6-generated load cleanly.*
 
 ---
 
@@ -202,4 +204,6 @@ A related improvement surfaced in passing — the profile page shows a rating co
 
 ### Grafana screenshots
 
-*TODO — file under `docs/screenshots/dashboards/` during Piece 3 wrap. The k6 runs did show as per-service request-rate spikes on the MicroFlix Overview dashboard; notable shape change is movie-service request rate dropping from the 1+N tall spike under the watchlist baseline to a flat ≈5 req/sec matching the iteration rate under the aggregated scenario — the fan-out moved inside the gateway and is no longer visible from the client's perspective on the per-service graphs.*
+![Watchlist-baseline per-service request rate — movie-service ~10× rating-service](screenshots/dashboards/watchlist-baseline-request-rate.png)
+
+*Watchlist-baseline (pre-migration) per-service request rate. movie-service spikes to ~10× rating-service — the 1+N fan-out is directly visible on the per-service graph. After the migration, this shape collapses: movie-service request rate drops to a flat ~5 req/sec matching the iteration rate, because the fan-out moved inside the gateway and the browser issues one request per page load instead of twelve.*
