@@ -34,4 +34,7 @@ export const PATH = {
     watchlist:       '/rating-service/api/v1/engagements/watchlist',
     watchlistForId:  (id) => `/rating-service/api/v1/engagements/watchlist/${id}`,
     inWatchlist:     (id) => `/rating-service/api/v1/engagements/watchlist/${id}/me`,
+    // Gateway aggregation endpoints — hit by the post-migration scenarios.
+    catalogMovie:    (id) => `/api/v1/catalog/movies/${id}`,
+    catalogWatchlist: '/api/v1/catalog/watchlist',
 };

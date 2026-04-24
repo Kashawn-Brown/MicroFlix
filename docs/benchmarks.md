@@ -113,10 +113,91 @@ Screenshot: *TODO — to be captured and filed under `docs/screenshots/dashboard
 
 ---
 
-## Piece 2 — migration and re-measurement *(next kickoff)*
+## Piece 2 — migration and re-measurement
 
-Planned but not yet done:
+### What shipped
 
-- **Movie-detail:** migrate the page (SSR + `MovieActions`) onto `GET /api/v1/catalog/movies/{id}`. Re-run `movie-detail-baseline.js` unchanged; compare `page_load_duration` median-of-3 before/after. The aggregation endpoint does the same 4 downstream calls internally, so the question is whether gateway-side parallelism + one TCP round-trip beats 4 browser-side concurrent round-trips across wall-clock latency.
-- **Watchlist:** decide the shape. No matching aggregation endpoint exists today. Options: add one at the gateway, change the server-side vs client-side split, or leave the page alone if measurement says the 1+N is already cheap enough to not justify the aggregation complexity. Decision will be recorded here before any code changes.
-- Grafana before/after screenshots filed under `docs/screenshots/dashboards/`.
+- **Movie-detail** migrated onto `GET /api/v1/catalog/movies/{id}` (already existed from an earlier gateway pass). `app/movies/[id]/page.tsx` does one anonymous SSR fetch; `components/movie-actions.tsx` does one authed CSR fetch. The gateway fans out to movie-service + rating-service internally via `Mono.zip` and short-circuits the `me` section server-side when no Authorization header is present, so the SSR path skips the authed downstream calls entirely.
+- **Watchlist** migrated onto a new `GET /api/v1/catalog/watchlist` endpoint. `CatalogService.getWatchlist(authHeader)` calls rating-service for engagements, short-circuits empty lists, then hits a new `GET /api/v1/movies/batch?ids=...` endpoint on movie-service for one-shot hydration. The join is a pure static helper (`CatalogService.joinWatchlist`) covered by unit tests — it preserves rating-service's `addedAt`-desc order and drops engagements whose movie row has gone missing.
+- The movie-service batch endpoint is capped at 50 ids and preserves input-id order (the default `findAllById` return is DB-order, not input-order — the service explicitly re-sorts via a `Map<Long, Movie>` lookup). Covered by `MovieServiceBatchTest` (ordering, drops, empty, null, over-cap, at-cap) and a `@SpringBootTest` integration test against H2 in Postgres-compat mode.
+
+New k6 scripts in `k6/scenarios/`:
+
+- `movie-detail-aggregated.js` — 2 calls per iteration (anonymous SSR + authed CSR), same 20 iter/sec load shape as the baseline
+- `watchlist-aggregated.js` — 1 call per iteration, same 5 iter/sec load shape as the baseline
+
+### Piece 2 measurements — `page_load_duration`, median-of-3
+
+#### Movie-detail — 4 direct calls → 2 aggregated calls
+
+| Metric | Baseline median | Aggregated run 1 | Aggregated run 2 | Aggregated run 3 | **Aggregated median** | Δ vs baseline |
+|---|---|---|---|---|---|---|
+| page_load p50 | 4 ms | 7 ms | 5 ms | 4 ms | **5 ms** | +1 ms |
+| page_load p90 | 5 ms | 13 ms | 7 ms | 6 ms | **7 ms** | +2 ms |
+| page_load p95 | 5 ms | 16 ms | 8 ms | 7 ms | **8 ms** | +3 ms |
+| page_load max | 15 ms | 46 ms | 23 ms | 19 ms | **23 ms** | +8 ms |
+| http_req p50 | 2.69 ms | 6.79 ms | 4.88 ms | 3.95 ms | **4.88 ms** | +2.19 ms |
+| http_req p95 | 4.17 ms | 15.25 ms | 6.84 ms | 5.99 ms | **6.84 ms** | +2.67 ms |
+| iterations | 1200 | 1201 | 1201 | 1201 | **1201** | — |
+| http_reqs/sec | 80.0 | 40.4 | 40.1 | 40.1 | **40.1** | **–50%** |
+| errors | 0 | 0/2416 | 0/2416 | 0/2416 | **0** | — |
+
+Run 1 is visibly cold-cache — that's first-run-after-restart noise the median-of-3 is designed to absorb.
+
+#### Watchlist — 1+N (12 total) → 1 aggregated
+
+| Metric | Baseline median | Aggregated run 1 | Aggregated run 2 | Aggregated run 3 | **Aggregated median** | Δ vs baseline |
+|---|---|---|---|---|---|---|
+| page_load p50 | 11 ms | 12 ms | 10 ms | 10 ms | **10 ms** | –1 ms |
+| page_load p90 | 14.1 ms | 15 ms | 13 ms | 13 ms | **13 ms** | –1.1 ms |
+| page_load p95 | 16 ms | 17 ms | 14 ms | 14 ms | **14 ms** | **–2 ms (–12%)** |
+| page_load max | 29 ms | 43 ms | 20 ms | 18 ms | **20 ms** | –9 ms |
+| http_req p50 | 3.27 ms | 11.91 ms | 10.09 ms | 9.7 ms | **10.09 ms** | +6.82 ms |
+| http_req p95 | 4.97 ms | 17 ms | 13.79 ms | 13.86 ms | **13.86 ms** | +8.89 ms |
+| iterations | 301 | 301 | 300 | 301 | **301** | — |
+| http_reqs/sec | 60.2 | 5.2 | 5.2 | 5.2 | **5.2** | **–91%** |
+| errors | 0 | 0/315 | 0/314 | 0/315 | **0** | — |
+
+### Reading the numbers honestly
+
+**Movie-detail is slightly slower after the migration** (p95 5 ms → 8 ms). This is not a surprise once you look at what each version is actually doing:
+
+- Baseline fires 4 parallel *simple* downstream calls (PK lookup on movies, summary aggregate on ratings, single-row my-rating, single-row watchlist boolean). Each downstream call is ~2–4 ms; the `http.batch` wall-clock is bounded by the slowest of 4.
+- Aggregated fires 2 parallel *compound* gateway calls. Each compound call is itself `Mono.zip` over 3 parallel downstream fetches — so every aggregated request's latency is already "slowest of 3" before the two aggregated calls race each other.
+
+In local Docker where inter-container RTT is ~0.3 ms, the gateway hop doesn't buy anything back. In a cross-AZ deployment where client→gateway is 50–200 ms but gateway→service is 1 ms, the math flips: consolidating 4 cross-AZ round-trips into 2 cross-AZ round-trips (with the fan-out happening intra-AZ) would visibly win. The local measurement isn't wrong — it's just measuring in the regime where the architectural value is invisible.
+
+The `http_reqs/sec` column is where the migration's value is already visible in these numbers: 80 req/sec → 40 req/sec at the same page-load rate means the client is generating half the gateway traffic per page view. That's capacity headroom — the same machine can serve twice as many page loads before it saturates anything.
+
+**Watchlist is slightly faster at the tail** (p95 16 ms → 14 ms, –12%) and **dramatically fewer requests** (60 req/sec → 5 req/sec, –91%).
+
+- Baseline has a sequential engagement fetch (~3 ms) followed by an 11-way parallel fan-out whose tail is bounded by the slowest of 11 — more parallel fetches mean a wider tail. Total p95 was 16 ms.
+- Aggregated collapses both steps into one call that does the fan-out reactively on the gateway (2 downstream: engagements + movie-batch). The per-request latency is higher (~10 ms vs ~3 ms) because it's doing more work per request, but the *page_load* number — which is what the user feels — came down because we cut the sequential engagement→movies gap that the baseline couldn't avoid.
+
+The watchlist wins here were real even in local Docker: the baseline's "1 sequential + N parallel" shape had a structural round-trip that the aggregation eliminates, independent of network cost.
+
+### Methodology — `http.batch` over-models browser parallelism
+
+Both baseline and aggregated movie-detail scripts fire the SSR-analogue and CSR-analogue requests in a single `http.batch`, i.e. fully parallel. Real browsers don't do that. The actual timeline is:
+
+1. Browser sends page request.
+2. Next.js server runs the page's async body, fires the SSR-side fetches, waits for them, renders HTML, returns.
+3. Browser receives HTML and renders it. Page is *visible* here.
+4. React hydrates `MovieActions`; its `useEffect` fires the CSR-side fetches.
+5. Authed rating/watchlist section fills in.
+
+The CSR fetches can't start until after the SSR response lands and hydration runs. So the real user-perceived "fully loaded" time is closer to `(SSR fan-out) + (hydration gap) + (CSR fan-out)`, not `max(SSR, CSR)`.
+
+Keeping `http.batch` in both scripts preserves apples-to-apples comparability — both before and after numbers are wrong by the same factor, and the Δ stays honest. A more realistic model would fire the calls sequentially and accept that the baseline's SSR-vs-CSR structure means the aggregation saves 2 cross-process round-trips (1 on each side), which in local Docker is still tiny but would matter more on real networks.
+
+Left as future work — calling out here so the numbers above aren't over-interpreted.
+
+### Natural extension — profile/ratings
+
+`app/profile/ratings/page.tsx` has the same 1+N shape as the pre-migration watchlist: one `fetchMyRatings` call followed by a parallel fan-out of `fetchMovieById` per rating. The same aggregation treatment would apply cleanly — add `GET /api/v1/catalog/my-ratings` at the gateway, call rating-service for the user's ratings, hydrate via the movie-service batch endpoint, return `[{movie, rate, ...}]` already joined. Not in scope for Branch 3, but earmarked as the obvious next page to consolidate.
+
+A related improvement surfaced in passing — the profile page shows a rating count that includes orphans (ratings whose movie row went missing), so it can disagree with the list which drops them. A `GET /api/v1/catalog/my-ratings/count` endpoint (or making the list endpoint also return the resolvable count) would make the two consistent. Also not in scope here.
+
+### Grafana screenshots
+
+*TODO — file under `docs/screenshots/dashboards/` during Piece 3 wrap. The k6 runs did show as per-service request-rate spikes on the MicroFlix Overview dashboard; notable shape change is movie-service request rate dropping from the 1+N tall spike under the watchlist baseline to a flat ≈5 req/sec matching the iteration rate under the aggregated scenario — the fan-out moved inside the gateway and is no longer visible from the client's perspective on the per-service graphs.*
