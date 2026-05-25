@@ -16,14 +16,15 @@ The project was deployed to AWS EC2 with a real CI/CD pipeline through GitHub Ac
 
 This was built as deliberate practice, not as a product. What it demonstrates is end-to-end work on a real distributed backend system:
 
-- Designing service boundaries along genuine data ownership lines (users, movies, ratings)
+- Designing service boundaries along genuine data ownership lines (users, movies, ratings); one database per data-owning service, coordinated via Docker Compose
 - Cross-service authentication via JWTs verified independently per service, no central auth round-trip
 - API gateway with routing and parallel aggregation across multiple downstream services
-- One database per data-owning service, coordinated via Docker Compose
 - Standardized error handling across services using RFC 7807 `ProblemDetail`
 - Multi-stage Docker builds, Docker Compose orchestration with separate dev and prod overrides
 - End-to-end metrics pipeline with Micrometer, Prometheus, and provisioned Grafana dashboards
-- Performance work driven by measurement: a meaningful TMDb-seeded catalog (~3.7k movies, ~8.4k movie–genre links), `EXPLAIN ANALYZE` against the hot query paths, targeted indexes added through Flyway, and explicit "considered but rejected" entries where adding an index wasn't worth its write cost
+- Measurement-driven performance work at the database layer against a meaningful TMDb-seeded catalog (~3.7k movies, ~8.4k movie–genre links): `EXPLAIN ANALYZE` on hot query paths producing targeted Flyway indexes, with the highest-leverage lookup going from seq scan to index scan (~28× faster, ~75× fewer buffers)
+- Measurement-driven performance work at the HTTP layer: k6 load tests surfacing a 1+N pattern on the watchlist page, collapsed to a single aggregation call (12 browser round trips → 1) backed by a new batch endpoint on movie-service
+- Explicit "considered but rejected" decisions at both layers (indexes rejected for write cost, aggregation approaches rejected for not eliminating the pattern) — the engineering judgment is documented alongside what shipped
 - Real CI/CD through GitHub Actions — CI builds and pushes images, CD pulls and deploys, with explicit ordering between them
 - AWS EC2 deployment with real production debugging (browser/SSR/container networking, sizing, disk pressure)
 
@@ -37,7 +38,7 @@ This was built as deliberate practice, not as a product. What it demonstrates is
   User registration, login (JWT), `/users/me`, profile update, and password change.
 
 - `modules/movie-service`  
-  Movie metadata (title, overview, year, genres, poster/backdrop) with search/filter/sort + pagination, TMDb-based seeding, and Flyway-managed indexes (V4 base coverage; V5 added trigram search and `tmdb_id` lookup; V6 promoted `tmdb_id` to UNIQUE).
+  Movie metadata (title, overview, year, genres, poster/backdrop) with search/filter/sort + pagination, TMDb-based seeding, a batch lookup endpoint for gateway aggregation, and Flyway-managed indexes (V4 base coverage; V5 added trigram search and `tmdb_id` lookup; V6 promoted `tmdb_id` to UNIQUE).
 
 - `modules/tmdb-ingestion-service`  
   One-shot Spring Boot job that seeds movies from TMDb into `movie-service` and can enrich them (e.g. runtime). Throttled per-call against TMDb's rate limit with retry-on-429. Two modes: full seeding (default) and `--mode=scheduled` (volatile endpoints + date-windowed `discover`) for cron-style top-ups.
@@ -46,7 +47,7 @@ This was built as deliberate practice, not as a product. What it demonstrates is
   Movie ratings (1–10 scale with 0.1 increments, stored as `rating_times_ten`) plus a watchlist feature via a generic `engagements` table.
 
 - `modules/gateway`  
-  Spring Cloud Gateway entrypoint. Routes traffic to the microservices and exposes **aggregated catalog endpoints** for the frontend (`/api/v1/catalog/movies/{id}` for the movie-detail page and `/api/v1/catalog/watchlist` for the watchlist page).
+  Spring Cloud Gateway entrypoint. Routes traffic to the microservices and exposes aggregated catalog endpoints that collapse multi-request page loads into single calls (`/api/v1/catalog/movies/{id}` for movie detail, `/api/v1/catalog/watchlist` for the watchlist page).
 
 - `modules/discovery`  
   Eureka discovery server so services can find each other by name (`lb://user-service`, `lb://movie-service`, etc.).
